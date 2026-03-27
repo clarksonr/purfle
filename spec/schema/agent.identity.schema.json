@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://purfle.dev/schema/0.1/agent.identity.schema.json",
+  "title": "Purfle Agent Identity",
+  "description": "Cryptographic identity block embedded in an agent manifest.",
+  "type": "object",
+  "required": ["author", "email", "key_id", "algorithm", "issued_at", "expires_at", "signature"],
+  "additionalProperties": false,
+  "properties": {
+    "author": {
+      "type": "string",
+      "description": "Display name of the agent's author or publishing organization.",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "email": {
+      "type": "string",
+      "description": "Contact email of the author.",
+      "format": "email"
+    },
+    "key_id": {
+      "type": "string",
+      "description": "Identifier of the signing key registered in the Purfle key registry.",
+      "minLength": 1
+    },
+    "algorithm": {
+      "type": "string",
+      "description": "JWA algorithm identifier. ES256 is the only supported value in v0.1.",
+      "enum": ["ES256"]
+    },
+    "issued_at": {
+      "type": "string",
+      "description": "ISO 8601 timestamp when the manifest was signed.",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "description": "ISO 8601 timestamp after which the manifest is invalid.",
+      "format": "date-time"
+    },
+    "signature": {
+      "type": "string",
+      "description": "JWS Compact Serialization of the canonical manifest body. The payload is the canonical JSON of the manifest with this field omitted.",
+      "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]*\\.[A-Za-z0-9_-]+$"
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "purfle": "0.1",
+  "id": "33333333-3333-4333-a333-333333333333",
+  "name": "Trusted Code Reviewer",
+  "version": "2.1.0",
+  "description": "A code review agent with filesystem and MCP tool access. Demonstrates a fully-specified trusted-agent manifest.",
+  "identity": {
+    "author": "Purfle Platform",
+    "email": "agents@purfle.dev",
+    "key_id": "purfle-platform-key-2026",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-27T00:00:00Z",
+    "expires_at": "2026-09-27T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1wbGF0Zm9ybS1rZXktMjAyNiJ9.PLACEHOLDER.PLACEHOLDER"
+  },
+  "capabilities": [
+    {
+      "id": "code-review",
+      "description": "Reads source files and produces structured code review feedback.",
+      "required": true
+    },
+    {
+      "id": "diff-analysis",
+      "description": "Analyzes git diffs and summarizes changes.",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "filesystem": {
+      "read": ["/workspace/src/**", "/workspace/tests/**"],
+      "write": ["/workspace/review-output"]
+    },
+    "environment": {
+      "allow": ["ANTHROPIC_API_KEY"]
+    },
+    "tools": {
+      "mcp": ["file", "git"]
+    }
+  },
+  "lifecycle": {
+    "init_timeout_ms": 5000,
+    "max_runtime_ms": 120000,
+    "on_error": "suspend",
+    "restartable": false
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic",
+    "model": "claude-opus-4-6",
+    "adapter": "openclaw"
+  },
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "pr_number": { "type": "integer" },
+        "repo_path": { "type": "string" }
+      },
+      "required": ["pr_number", "repo_path"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "summary": { "type": "string" },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "file": { "type": "string" },
+              "line": { "type": "integer" },
+              "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["summary", "issues"]
+    }
+  }
+}

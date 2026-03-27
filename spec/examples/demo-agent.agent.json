@@ -1,0 +1,52 @@
+{
+  "purfle": "0.1",
+  "id": "44444444-4444-4444-a444-444444444444",
+  "name": "Demo Agent",
+  "version": "0.1.0",
+  "description": "Minimal agent for local demonstration. Uses the Anthropic adapter with no required capabilities.",
+  "identity": {
+    "author": "Roman Noble",
+    "email": "roman@example.com",
+    "key_id": "demo-key-001",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-27T00:00:00Z",
+    "expires_at": "2027-03-27T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImRlbW8ta2V5LTAwMSJ9.PLACEHOLDER.PLACEHOLDER"
+  },
+  "capabilities": [],
+  "permissions": {
+    "network": {
+      "allow": ["https://api.anthropic.com/*"]
+    },
+    "environment": {
+      "allow": ["ANTHROPIC_API_KEY"]
+    }
+  },
+  "lifecycle": {
+    "init_timeout_ms": 5000,
+    "max_runtime_ms": 30000,
+    "on_error": "terminate",
+    "restartable": true
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic",
+    "model": "claude-haiku-4-5"
+  },
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" }
+      },
+      "required": ["message"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "response": { "type": "string" }
+      },
+      "required": ["response"]
+    }
+  }
+}

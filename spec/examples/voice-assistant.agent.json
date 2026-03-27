@@ -1,0 +1,65 @@
+{
+  "purfle": "0.1",
+  "id": "22222222-2222-4222-a222-222222222222",
+  "name": "Voice Assistant",
+  "version": "1.0.0",
+  "description": "A voice-capable assistant that queries a search API and returns spoken responses. Requires network access.",
+  "identity": {
+    "author": "Roman Noble",
+    "email": "roman@example.com",
+    "key_id": "purfle-dev-key-001",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-27T00:00:00Z",
+    "expires_at": "2027-03-27T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1kZXYta2V5LTAwMSJ9.PLACEHOLDER.PLACEHOLDER"
+  },
+  "capabilities": [
+    {
+      "id": "web-search",
+      "description": "Queries a web search API for answers.",
+      "required": true
+    },
+    {
+      "id": "text-to-speech",
+      "description": "Synthesizes spoken audio from text output.",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": {
+      "allow": ["https://api.search.example.com/*"],
+      "deny": ["*"]
+    },
+    "environment": {
+      "allow": ["SEARCH_API_KEY", "ANTHROPIC_API_KEY"]
+    }
+  },
+  "lifecycle": {
+    "init_timeout_ms": 3000,
+    "max_runtime_ms": 30000,
+    "on_error": "terminate",
+    "restartable": true
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "openai-compatible",
+    "model": "gpt-4o"
+  },
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "utterance": { "type": "string", "description": "Raw spoken input, transcribed." }
+      },
+      "required": ["utterance"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "audio_url": { "type": "string", "format": "uri" }
+      },
+      "required": ["text"]
+    }
+  }
+}

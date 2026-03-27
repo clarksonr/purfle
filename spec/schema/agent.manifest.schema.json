@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://purfle.dev/schema/agent.manifest.schema.json",
+  "title": "Purfle Agent Manifest",
+  "description": "Defines the identity, capabilities, permissions, and lifecycle of a Purfle agent.",
+  "type": "object",
+  "required": ["specVersion", "identity", "lifecycle"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "specVersion": {
+      "type": "string",
+      "description": "Version of the Purfle manifest spec this file conforms to.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "identity": {
+      "$ref": "#/definitions/identity"
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "Declared capabilities this agent exposes.",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "permissions": {
+      "type": "array",
+      "description": "Permissions this agent requests from the host runtime.",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "lifecycle": {
+      "$ref": "#/definitions/lifecycle"
+    }
+  },
+  "definitions": {
+    "identity": {
+      "type": "object",
+      "required": ["id", "name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Globally unique agent identifier. Recommended: URN form urn:purfle:agent:<name>.",
+          "pattern": "^urn:purfle:agent:[a-z0-9_-]+(:[a-z0-9_-]+)*$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable agent name.",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "version": {
+          "type": "string",
+          "description": "Semantic version of this agent.",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "publisher": {
+          "type": "string",
+          "description": "Publisher identifier (GitHub handle, org name, or DID).",
+          "minLength": 1
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "required": ["entrypoint"],
+      "additionalProperties": false,
+      "properties": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Path to the agent's main executable or script, relative to repo root."
+        },
+        "runtime": {
+          "type": "string",
+          "description": "Runtime hint for the host (e.g. 'node', 'dotnet', 'python').",
+          "enum": ["node", "dotnet", "python", "wasm"]
+        }
+      }
+    }
+  }
+}

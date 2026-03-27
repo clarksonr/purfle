@@ -1,0 +1,13 @@
+# Claude Code local settings
+.claude/settings.local.json
+
+# .NET build output
+bin/
+obj/
+
+# Local secrets — never commit
+**/Properties/launchSettings.json
+
+# Node
+node_modules/
+sdk/packages/*/dist/

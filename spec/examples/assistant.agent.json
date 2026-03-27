@@ -1,0 +1,21 @@
+{
+  "$schema": "../../spec/schema/agent.manifest.schema.json",
+  "specVersion": "0.1.0",
+  "identity": {
+    "id": "urn:purfle:agent:assistant",
+    "name": "assistant",
+    "version": "0.1.0",
+    "publisher": "clarksonr"
+  },
+  "capabilities": [
+    "llm.chat"
+  ],
+  "permissions": [
+    "network.outbound",
+    "env.ANTHROPIC_API_KEY"
+  ],
+  "lifecycle": {
+    "entrypoint": "spec/examples/assistant.js",
+    "runtime": "node"
+  }
+}
