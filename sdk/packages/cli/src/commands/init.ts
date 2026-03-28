@@ -20,9 +20,9 @@ export function initCommand(name: string, options: { dir?: string }): void {
     version: "0.1.0",
     description: `${name} agent.`,
     identity: {
-      author: "",
-      email: "",
-      key_id: "",
+      author: "unsigned",
+      email: "unsigned@placeholder.local",
+      key_id: "unsigned",
       algorithm: "ES256",
       issued_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),

@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test": "node --test dist/**/*.test.js"
   },
   "dependencies": {
     "@purfle/core": "0.1.0",

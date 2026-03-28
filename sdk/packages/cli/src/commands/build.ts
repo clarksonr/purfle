@@ -30,7 +30,7 @@ export function buildCommand(dir: string): void {
     console.log(`   on_error:    ${manifest.lifecycle.on_error}`);
     console.log(`   capabilities: ${manifest.capabilities.length} declared`);
 
-    const missingIdentity = !manifest.identity.author || !manifest.identity.email || !manifest.identity.key_id;
+    const missingIdentity = !manifest.identity.signature || manifest.identity.key_id === "unsigned";
     if (missingIdentity) {
       console.log();
       console.log("  ! identity block is incomplete (author/email/key_id). Run purfle sign to complete.");
