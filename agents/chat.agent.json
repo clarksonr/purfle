@@ -1,0 +1,47 @@
+{
+  "purfle": "0.1",
+  "id": "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa",
+  "name": "Purfle Chat",
+  "version": "1.0.0",
+  "description": "A general-purpose conversational agent. Send a message, get a response. Minimal permissions — API key only.",
+  "identity": {
+    "author": "Roman Noble",
+    "email": "roman@purfle.dev",
+    "key_id": "purfle-samples-key-001",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-28T00:00:00Z",
+    "expires_at": "2027-03-28T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1zYW1wbGVzLWtleS0wMDEifQ.PLACEHOLDER.PLACEHOLDER"
+  },
+  "capabilities": [],
+  "permissions": {
+    "environment": {
+      "allow": ["ANTHROPIC_API_KEY"]
+    }
+  },
+  "lifecycle": {
+    "on_error": "terminate",
+    "restartable": true
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic",
+    "model": "claude-haiku-4-5-20251001"
+  },
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string", "description": "The user's message." }
+      },
+      "required": ["message"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "response": { "type": "string", "description": "The agent's reply." }
+      },
+      "required": ["response"]
+    }
+  }
+}

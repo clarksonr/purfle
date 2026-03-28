@@ -1,0 +1,62 @@
+{
+  "purfle": "0.1",
+  "id": "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+  "name": "File Summarizer",
+  "version": "1.0.0",
+  "description": "Reads a local text or markdown file and returns a concise summary with word count. Declares filesystem.read on user document paths — the sandbox enforces read-only access to those paths only.",
+  "identity": {
+    "author": "Roman Noble",
+    "email": "roman@purfle.dev",
+    "key_id": "purfle-samples-key-001",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-28T00:00:00Z",
+    "expires_at": "2027-03-28T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1zYW1wbGVzLWtleS0wMDEifQ.PLACEHOLDER.PLACEHOLDER"
+  },
+  "capabilities": [
+    {
+      "id": "filesystem-read",
+      "description": "Reads files from the local filesystem to fulfill summarization requests.",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "filesystem": {
+      "read": [
+        "C:/Users/**/*.txt",
+        "C:/Users/**/*.md",
+        "C:/Users/**/*.pdf"
+      ]
+    },
+    "environment": {
+      "allow": ["ANTHROPIC_API_KEY"]
+    }
+  },
+  "lifecycle": {
+    "init_timeout_ms": 5000,
+    "max_runtime_ms": 60000,
+    "on_error": "terminate"
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic",
+    "model": "claude-haiku-4-5-20251001"
+  },
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "file_path": { "type": "string", "description": "Absolute path to the file to summarize." }
+      },
+      "required": ["file_path"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "summary": { "type": "string", "description": "Concise summary of the file contents." },
+        "word_count": { "type": "integer", "description": "Approximate word count of the source file." }
+      },
+      "required": ["summary", "word_count"]
+    }
+  }
+}

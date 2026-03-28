@@ -10,6 +10,24 @@ namespace Purfle.Runtime.Anthropic;
 /// <summary>
 /// Inference adapter for the Anthropic Messages API (https://api.anthropic.com/v1/messages).
 ///
+/// <para>
+/// On construction the adapter inspects the agent's <see cref="AgentSandbox"/> and builds a
+/// list of tools it will advertise to the model:
+/// <list type="bullet">
+///   <item><term>read_file</term><description>offered when <c>permissions.filesystem.read</c> is non-empty</description></item>
+///   <item><term>write_file</term><description>offered when <c>permissions.filesystem.write</c> is non-empty</description></item>
+///   <item><term>http_get</term><description>offered when <c>permissions.network.allow</c> is non-empty</description></item>
+/// </list>
+/// </para>
+///
+/// <para>
+/// When tools are present, <see cref="InvokeAsync"/> runs a tool-call loop: it sends the
+/// user message to the API with the tool definitions, executes any <c>tool_use</c> blocks the
+/// model emits (checking the sandbox before every execution), feeds the results back, and
+/// repeats until the model returns <c>stop_reason: end_turn</c>. If no tools are configured
+/// (e.g. a minimal chat agent) the loop is skipped and a single-turn request is made instead.
+/// </para>
+///
 /// Requirements:
 ///   - The manifest must declare <c>ANTHROPIC_API_KEY</c> in
 ///     <c>permissions.environment.allow</c>; the sandbox enforces this.
@@ -18,15 +36,23 @@ namespace Purfle.Runtime.Anthropic;
 /// </summary>
 public sealed class AnthropicAdapter : IInferenceAdapter
 {
-    private const string ApiEndpoint = "https://api.anthropic.com/v1/messages";
-    private const string ApiVersion = "2023-06-01";
-    private const string EnvApiKey = "ANTHROPIC_API_KEY";
+    private const string ApiEndpoint  = "https://api.anthropic.com/v1/messages";
+    private const string ApiVersion   = "2023-06-01";
+    private const string EnvApiKey    = "ANTHROPIC_API_KEY";
     private const string DefaultModel = "claude-sonnet-4-6";
 
-    private readonly HttpClient _http;
-    private readonly string _model;
-    private readonly string _apiKey;
+    /// <summary>Maximum tool-call iterations before the loop is aborted.</summary>
+    private const int MaxIterations = 10;
 
+    private readonly HttpClient  _http;
+    private readonly string      _model;
+    private readonly string      _apiKey;
+    private readonly AgentSandbox _sandbox;
+
+    /// <summary>Tools built from the manifest permissions. Empty for agents with no OS access.</summary>
+    private readonly IReadOnlyList<ToolDefinition> _tools;
+
+    /// <inheritdoc/>
     public string EngineId => "anthropic";
 
     /// <summary>
@@ -53,23 +79,261 @@ public sealed class AnthropicAdapter : IInferenceAdapter
             throw new InvalidOperationException(
                 $"Environment variable '{EnvApiKey}' is not set.");
 
-        _apiKey = key;
-        _model = manifest.Runtime.Model ?? DefaultModel;
-        _http = http ?? new HttpClient();
+        _apiKey  = key;
+        _model   = manifest.Runtime.Model ?? DefaultModel;
+        _http    = http ?? new HttpClient();
+        _sandbox = sandbox;
+        _tools   = BuildTools(manifest.Permissions);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Sends an inference request to the Anthropic Messages API and returns the model's
+    /// text response.
+    ///
+    /// <para>
+    /// When the manifest grants filesystem or network permissions, the adapter advertises
+    /// the corresponding tools (<c>read_file</c>, <c>write_file</c>, <c>http_get</c>) to
+    /// the model and runs a tool-call loop:
+    /// <list type="number">
+    ///   <item>POST the message with tool definitions.</item>
+    ///   <item>If the model returns <c>stop_reason: tool_use</c>, execute each tool call
+    ///         after verifying it against the sandbox.</item>
+    ///   <item>POST the tool results back and repeat until <c>stop_reason: end_turn</c>.</item>
+    /// </list>
+    /// The loop is capped at <see cref="MaxIterations"/> to prevent runaway execution.
+    /// </para>
+    ///
+    /// <para>
+    /// When no tools are configured the method falls back to a single-turn request,
+    /// preserving the original behaviour for minimal agents such as the chat agent.
+    /// </para>
+    /// </summary>
     public async Task<string> InvokeAsync(
         string systemPrompt,
         string userMessage,
         CancellationToken ct = default)
     {
-        var requestBody = new MessagesRequest(
-            Model: _model,
-            MaxTokens: 4096,
-            System: systemPrompt,
-            Messages: [new Message(Role: "user", Content: userMessage)]);
+        if (_tools.Count == 0)
+            return await InvokeSingleTurnAsync(systemPrompt, userMessage, ct);
 
+        return await InvokeWithToolsAsync(systemPrompt, userMessage, ct);
+    }
+
+    // ── Single-turn path (no tools configured) ───────────────────────────────
+
+    private async Task<string> InvokeSingleTurnAsync(
+        string systemPrompt, string userMessage, CancellationToken ct)
+    {
+        var request = new MessagesRequest(
+            Model:    _model,
+            MaxTokens: 4096,
+            System:   systemPrompt,
+            Messages: [new TextMessage("user", userMessage)],
+            Tools:    null);
+
+        var response = await PostAsync(request, ct);
+        return response.Content.First(b => b.Type == "text").Text
+               ?? throw new InvalidOperationException("Anthropic API returned no text content.");
+    }
+
+    // ── Tool-call loop ────────────────────────────────────────────────────────
+
+    private async Task<string> InvokeWithToolsAsync(
+        string systemPrompt, string userMessage, CancellationToken ct)
+    {
+        var messages = new List<object>
+        {
+            new TextMessage("user", userMessage),
+        };
+
+        for (int i = 0; i < MaxIterations; i++)
+        {
+            var request = new MessagesRequest(
+                Model:    _model,
+                MaxTokens: 4096,
+                System:   systemPrompt,
+                Messages: messages,
+                Tools:    _tools);
+
+            var response = await PostAsync(request, ct);
+
+            if (response.StopReason == "end_turn")
+            {
+                var textBlock = response.Content.FirstOrDefault(b => b.Type == "text");
+                return textBlock?.Text
+                       ?? throw new InvalidOperationException("Anthropic API returned end_turn with no text block.");
+            }
+
+            if (response.StopReason == "tool_use")
+            {
+                // Record the full assistant turn (may contain both text and tool_use blocks).
+                messages.Add(new ContentArrayMessage("assistant", response.Content));
+
+                // Execute each tool call and collect results.
+                var results = new List<ToolResultContent>();
+                foreach (var block in response.Content.Where(b => b.Type == "tool_use"))
+                {
+                    var result = await ExecuteToolAsync(block.Name!, block.Input, ct);
+                    results.Add(new ToolResultContent("tool_result", block.Id!, result));
+                }
+
+                messages.Add(new ToolResultMessage("user", results.ToArray()));
+                continue;
+            }
+
+            throw new InvalidOperationException(
+                $"Anthropic API returned unexpected stop_reason: '{response.StopReason}'.");
+        }
+
+        throw new InvalidOperationException(
+            $"Tool-call loop exceeded {MaxIterations} iterations without reaching end_turn.");
+    }
+
+    // ── Tool dispatch ─────────────────────────────────────────────────────────
+
+    private async Task<string> ExecuteToolAsync(
+        string toolName, JsonElement? input, CancellationToken ct)
+    {
+        return toolName switch
+        {
+            "read_file"  => ExecuteReadFile(input?.GetProperty("path").GetString() ?? ""),
+            "write_file" => ExecuteWriteFile(
+                                input?.GetProperty("path").GetString() ?? "",
+                                input?.GetProperty("content").GetString() ?? ""),
+            "http_get"   => await ExecuteHttpGetAsync(
+                                input?.GetProperty("url").GetString() ?? "", ct),
+            _            => $"Error: unknown tool '{toolName}'.",
+        };
+    }
+
+    /// <summary>
+    /// Reads a file from disk. The sandbox is checked before the read; if the path is not
+    /// covered by <c>permissions.filesystem.read</c> the error string is returned to the
+    /// model rather than raising an exception, allowing the model to recover gracefully.
+    /// </summary>
+    private string ExecuteReadFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return "Error: path must not be empty.";
+
+        if (!_sandbox.CanReadPath(path))
+            return $"Error: permission denied — '{path}' is not in the agent's filesystem.read allowlist.";
+
+        if (!File.Exists(path))
+            return $"Error: file not found — '{path}'.";
+
+        return File.ReadAllText(path);
+    }
+
+    /// <summary>
+    /// Writes content to a file. The sandbox is checked before the write; if the path is
+    /// not covered by <c>permissions.filesystem.write</c> the error string is returned to
+    /// the model rather than raising an exception.
+    /// </summary>
+    private string ExecuteWriteFile(string path, string content)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return "Error: path must not be empty.";
+
+        if (!_sandbox.CanWritePath(path))
+            return $"Error: permission denied — '{path}' is not in the agent's filesystem.write allowlist.";
+
+        var dir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
+
+        File.WriteAllText(path, content);
+        return "OK";
+    }
+
+    /// <summary>
+    /// Fetches a URL via HTTP GET. The sandbox is checked before the request; if the URL
+    /// is not covered by <c>permissions.network.allow</c> (or is explicitly denied) the
+    /// error string is returned to the model rather than raising an exception.
+    /// </summary>
+    private async Task<string> ExecuteHttpGetAsync(string url, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return "Error: url must not be empty.";
+
+        if (!_sandbox.CanAccessUrl(url))
+            return $"Error: permission denied — '{url}' is not in the agent's network.allow list.";
+
+        try
+        {
+            return await _http.GetStringAsync(url, ct);
+        }
+        catch (Exception ex)
+        {
+            return $"Error: HTTP GET failed — {ex.Message}";
+        }
+    }
+
+    // ── Tool building ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Inspects the agent's permission block and constructs the list of tools to advertise
+    /// to the model. Only tools backed by at least one permission pattern are included —
+    /// a chat agent with no filesystem or network permissions receives an empty list and
+    /// takes the single-turn path instead.
+    /// </summary>
+    private static IReadOnlyList<ToolDefinition> BuildTools(AgentPermissions permissions)
+    {
+        var tools = new List<ToolDefinition>();
+
+        if (permissions.Filesystem?.Read.Count > 0)
+        {
+            tools.Add(new ToolDefinition(
+                Name: "read_file",
+                Description: "Read the full text contents of a file on the local filesystem. " +
+                             "Only paths matching the agent's filesystem.read permission patterns are accessible.",
+                InputSchema: new InputSchema(
+                    Type: "object",
+                    Properties: new Dictionary<string, ToolProperty>
+                    {
+                        ["path"] = new ToolProperty("string", "Absolute path to the file to read."),
+                    },
+                    Required: ["path"])));
+        }
+
+        if (permissions.Filesystem?.Write.Count > 0)
+        {
+            tools.Add(new ToolDefinition(
+                Name: "write_file",
+                Description: "Write text content to a file on the local filesystem. " +
+                             "Only paths matching the agent's filesystem.write permission patterns are accessible.",
+                InputSchema: new InputSchema(
+                    Type: "object",
+                    Properties: new Dictionary<string, ToolProperty>
+                    {
+                        ["path"]    = new ToolProperty("string", "Absolute path to the file to write."),
+                        ["content"] = new ToolProperty("string", "Text content to write to the file."),
+                    },
+                    Required: ["path", "content"])));
+        }
+
+        if (permissions.Network?.Allow.Count > 0)
+        {
+            tools.Add(new ToolDefinition(
+                Name: "http_get",
+                Description: "Fetch a URL via HTTP GET and return the response body as text. " +
+                             "Only URLs matching the agent's network.allow patterns are accessible.",
+                InputSchema: new InputSchema(
+                    Type: "object",
+                    Properties: new Dictionary<string, ToolProperty>
+                    {
+                        ["url"] = new ToolProperty("string", "The URL to fetch."),
+                    },
+                    Required: ["url"])));
+        }
+
+        return tools;
+    }
+
+    // ── HTTP helper ───────────────────────────────────────────────────────────
+
+    private async Task<MessagesResponse> PostAsync(MessagesRequest requestBody, CancellationToken ct)
+    {
         using var request = new HttpRequestMessage(HttpMethod.Post, ApiEndpoint);
         request.Headers.Add("x-api-key", _apiKey);
         request.Headers.Add("anthropic-version", ApiVersion);
@@ -82,39 +346,58 @@ public sealed class AnthropicAdapter : IInferenceAdapter
             throw new InvalidOperationException($"Anthropic API {(int)response.StatusCode}: {body}");
         }
 
-        var result = await response.Content.ReadFromJsonAsync<MessagesResponse>(
-            s_serializerOptions, ct)
-            ?? throw new InvalidOperationException("Anthropic API returned an empty response.");
-
-        if (result.Content is not { Length: > 0 })
-            throw new InvalidOperationException("Anthropic API returned no content blocks.");
-
-        // Return the text of the first content block.
-        return result.Content[0].Text;
+        return await response.Content.ReadFromJsonAsync<MessagesResponse>(s_serializerOptions, ct)
+               ?? throw new InvalidOperationException("Anthropic API returned an empty response.");
     }
 
-    // ─── Request / response shapes ────────────────────────────────────────────
+    // ── Serializer options ────────────────────────────────────────────────────
 
     private static readonly JsonSerializerOptions s_serializerOptions = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy          = JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition        = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    // ── Request / response shapes ─────────────────────────────────────────────
+
     private sealed record MessagesRequest(
-        [property: JsonPropertyName("model")] string Model,
-        [property: JsonPropertyName("max_tokens")] int MaxTokens,
-        [property: JsonPropertyName("system")] string System,
-        [property: JsonPropertyName("messages")] Message[] Messages);
+        string Model,
+        int MaxTokens,
+        string System,
+        IEnumerable<object> Messages,
+        IReadOnlyList<ToolDefinition>? Tools);
 
-    private sealed record Message(
-        [property: JsonPropertyName("role")] string Role,
-        [property: JsonPropertyName("content")] string Content);
+    /// <summary>Regular text message (initial user turn, or any assistant turn without tools).</summary>
+    private sealed record TextMessage(string Role, string Content);
 
-    private sealed record MessagesResponse(
-        [property: JsonPropertyName("content")] ContentBlock[] Content);
+    /// <summary>
+    /// Assistant message whose content is an array of blocks (text + tool_use mix).
+    /// Sent back verbatim so the model retains its own reasoning.
+    /// </summary>
+    private sealed record ContentArrayMessage(string Role, ContentBlock[] Content);
+
+    /// <summary>User turn carrying tool results back to the model.</summary>
+    private sealed record ToolResultMessage(string Role, ToolResultContent[] Content);
 
     private sealed record ContentBlock(
-        [property: JsonPropertyName("type")] string Type,
-        [property: JsonPropertyName("text")] string Text);
+        string Type,
+        string? Text,
+        string? Id,
+        string? Name,
+        JsonElement? Input);
+
+    private sealed record MessagesResponse(
+        ContentBlock[] Content,
+        string StopReason);
+
+    private sealed record ToolResultContent(string Type, string ToolUseId, string Content);
+
+    private sealed record ToolDefinition(string Name, string Description, InputSchema InputSchema);
+
+    private sealed record InputSchema(
+        string Type,
+        Dictionary<string, ToolProperty> Properties,
+        string[] Required);
+
+    private sealed record ToolProperty(string Type, string Description);
 }

@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/runtime/src/">
+    <Project Path="runtime/src/Purfle.Runtime/Purfle.Runtime.csproj" />
+    <Project Path="runtime/src/Purfle.Runtime.Host/Purfle.Runtime.Host.csproj" />
+    <Project Path="runtime/src/Purfle.Runtime.OpenClaw/Purfle.Runtime.OpenClaw.csproj" />
+  </Folder>
+  <Folder Name="/runtime/tests/">
+    <Project Path="runtime/tests/Purfle.Runtime.Tests/Purfle.Runtime.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Purfle.Agents.Seeder/Purfle.Agents.Seeder.csproj" />
+  </Folder>
+  <Folder Name="/marketplace/src/">
+    <Project Path="marketplace/src/Purfle.Marketplace.Api/Purfle.Marketplace.Api.csproj" />
+    <Project Path="marketplace/src/Purfle.Marketplace.Core/Purfle.Marketplace.Core.csproj" />
+    <Project Path="marketplace/src/Purfle.Marketplace.Shared/Purfle.Marketplace.Shared.csproj" />
+    <Project Path="marketplace/src/Purfle.Marketplace.Storage.Json/Purfle.Marketplace.Storage.Json.csproj" />
+  </Folder>
+</Solution>
