@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Purfle.Marketplace.Api/Purfle.Marketplace.Api.csproj" />
+    <Project Path="src/Purfle.Marketplace.Data/Purfle.Marketplace.Data.csproj" />
+    <Project Path="src/Purfle.Marketplace.Shared/Purfle.Marketplace.Shared.csproj" />
+  </Folder>
+</Solution>

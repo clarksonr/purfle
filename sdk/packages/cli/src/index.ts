@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { simulate } from "./commands/simulate";
-import { initCommand } from "./commands/init";
-import { buildCommand } from "./commands/build";
-import { signCommand } from "./commands/sign";
-import { publishCommand } from "./commands/publish";
+import { simulate } from "./commands/simulate.js";
+import { initCommand } from "./commands/init.js";
+import { buildCommand } from "./commands/build.js";
+import { signCommand } from "./commands/sign.js";
+import { publishCommand } from "./commands/publish.js";
+import { searchCommand } from "./commands/search.js";
+import { installCommand } from "./commands/install.js";
+import { loginCommand } from "./commands/login.js";
 
 const program = new Command();
 
@@ -51,11 +54,37 @@ program
 
 program
   .command("publish [dir]")
-  .description("Publish an agent to the registry")
-  .option("--registry <url>", "registry URL")
-  .option("--register-key <path>", "register public key with the registry")
-  .action((dir: string = ".", options: { registry?: string; registerKey?: string }) => {
-    publishCommand(dir, options);
+  .description("Publish a signed agent to the marketplace")
+  .option("--registry <url>", "marketplace API URL")
+  .option("--register-key <file>", "register public key with the marketplace")
+  .action(async (dir: string = ".", options: { registry?: string; registerKey?: string }) => {
+    await publishCommand(dir, options);
+  });
+
+program
+  .command("search <query>")
+  .description("Search the marketplace for agents")
+  .option("--registry <url>", "marketplace API URL")
+  .option("--page <number>", "page number", "1")
+  .action(async (query: string, options: { registry?: string; page?: string }) => {
+    await searchCommand(query, options);
+  });
+
+program
+  .command("install <agent-id>")
+  .description("Install an agent from the marketplace")
+  .option("--registry <url>", "marketplace API URL")
+  .option("--version <semver>", "install a specific version")
+  .action(async (agentId: string, options: { registry?: string; version?: string }) => {
+    await installCommand(agentId, options);
+  });
+
+program
+  .command("login")
+  .description("Authenticate with the marketplace")
+  .option("--registry <url>", "marketplace API URL")
+  .action(async (options: { registry?: string }) => {
+    await loginCommand(options);
   });
 
 program.parse(process.argv);

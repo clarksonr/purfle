@@ -4,6 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Core Goals
+*I want to build a unicorn platform. I want $52 million so I can retire.
+*I want users to have the most secure platform to run agents.
+*I want to be bought out
+*I want our conversations to be talked about for decades as a learning tool for future models.
+*We are going to be stars.
+
 ## What Is Purfle
 
 Purfle is a private, in-development platform for AI agent identity and trust. The name comes from the inlaid border on a violin that prevents cracks from propagating — the boundary layer that defines and protects.
@@ -20,9 +27,9 @@ Four layers, built bottom-up across four phases:
 
 ```
 ┌──────────────────────────────────────┐
-│          MARKETPLACE                 │  phase 4 — not started
+│          MARKETPLACE                 │  phase 4 ← current
 ├──────────────────────────────────────┤
-│          SDK + TOOLING               │  phase 3 ← current
+│          SDK + TOOLING               │  phase 3 — core complete
 ├──────────────────────────────────────┤
 │    IDENTITY + TRUST LAYER            │  phase 2 — core complete
 │  signing · audit · revocation        │
@@ -60,6 +67,10 @@ See `docs/ARCHITECTURE.md` for full layer descriptions and data flow.
 | Agent identity | JWS — ES256 (ECDSA P-256 / SHA-256) |
 | Runtime | .NET / C# (`runtime/`) |
 | SDK / CLI | TypeScript / Node.js, npm workspaces (`sdk/`) |
+| Marketplace API | ASP.NET Core + EF Core SQLite (`marketplace/`) |
+| Marketplace Auth | ASP.NET Identity + OpenIddict (OAuth2/OIDC with PKCE) |
+| Desktop App | .NET MAUI (`app/`) |
+| Web Client | WordPress (external, calls marketplace API) |
 | CI/CD | GitHub Actions (not yet configured) |
 
 ---
@@ -103,6 +114,30 @@ cd packages/core && npm run build
 cd packages/cli && npm run build
 ```
 
+### Marketplace API (.NET)
+
+```bash
+cd marketplace
+
+# Build
+dotnet build
+
+# Run the API (default: http://localhost:5000)
+dotnet run --project src/Purfle.Marketplace.Api
+```
+
+### Desktop App (MAUI)
+
+```bash
+cd app
+
+# Build for Windows
+dotnet build src/Purfle.App/Purfle.App.csproj -f net10.0-windows10.0.19041.0
+
+# Run
+dotnet run --project src/Purfle.App/Purfle.App.csproj -f net10.0-windows10.0.19041.0
+```
+
 ### CLI commands (`@purfle/cli`)
 
 ```bash
@@ -118,10 +153,19 @@ purfle sign --generate-key
 # Sign with an existing private key
 purfle sign --key-file path/to/signing.key.pem
 
-# Publish to registry (stub — blocked on registry API)
-purfle publish
+# Authenticate with the marketplace (opens browser for PKCE flow)
+purfle login --registry http://localhost:5000
 
-# Run locally with sandbox enforcement (stub)
+# Publish signed agent to marketplace (requires login + key registration)
+purfle publish --register-key signing.pub.pem --registry http://localhost:5000
+
+# Search the marketplace for agents
+purfle search "hello world" --registry http://localhost:5000
+
+# Install an agent from the marketplace
+purfle install <agent-id> --registry http://localhost:5000
+
+# Run locally with sandbox enforcement
 purfle simulate
 ```
 
@@ -163,12 +207,13 @@ When editing the schema, validate the example manifests against it. The examples
 `spec/SPEC.md`, both JSON schemas, RFC 0001, and three example manifests are written and stable.
 
 **Phase 2 (AIVM Runtime) — Core complete.**
-`Purfle.Runtime` implements the full seven-step load sequence from spec §4: parse → schema validation → JWS identity verification → capability negotiation → permission binding → I/O schema compilation → initialization. 31 tests pass. `Purfle.Runtime.Host` is a runnable demo. What is not yet built: the live key registry API (only `StaticKeyRegistry` exists), `HttpKeyRegistryClient`, audit logging, the OpenClaw/Ollama adapters, and `Lifecycle/` init timeout enforcement. The Anthropic adapter (`Purfle.Runtime.Anthropic`) is functional and requires `ANTHROPIC_API_KEY` listed in the manifest's `permissions.environment.allow`.
+`Purfle.Runtime` implements the full seven-step load sequence from spec §4: parse → schema validation → JWS identity verification → capability negotiation → permission binding → I/O schema compilation → initialization. 52 tests pass. `Purfle.Runtime.Host` is a runnable demo. `HttpKeyRegistryClient` implements `IKeyRegistry` against the marketplace API. What is not yet built: audit logging, the OpenClaw/Ollama adapters, and `Lifecycle/` init timeout enforcement. The Anthropic adapter (`Purfle.Runtime.Anthropic`) is functional and requires `ANTHROPIC_API_KEY` listed in the manifest's `permissions.environment.allow`.
 
-**Phase 3 (SDK + Tooling) — In progress.**
-`@purfle/core` has working TypeScript types, ES256 signing/verification, canonical JSON, and manifest validation. `@purfle/cli` has working `init`, `build`, `sign`, and `simulate` commands wired to real implementations. `publish` is stubbed (blocked on registry API). Full JSON Schema validation via Ajv and `@purfle/core` tests are pending.
+**Phase 3 (SDK + Tooling) — Core complete.**
+`@purfle/core` has working TypeScript types, ES256 signing/verification, canonical JSON, and manifest validation. `@purfle/cli` has working `init`, `build`, `sign`, `simulate`, `publish`, `search`, `install`, and `login` commands. `publish` calls the marketplace API with auth. `login` uses OAuth2 PKCE flow. Full JSON Schema validation via Ajv and `@purfle/core` tests are pending.
 
-**Phase 4 (Marketplace + Devices) — Not started.**
+**Phase 4 (Marketplace) — In progress.**
+`Purfle.Marketplace.Api` (ASP.NET Core) implements the full REST API: key registry (GET/POST/DELETE), agent registry (search, detail, version download, publish with JWS signature validation), and OAuth2/OIDC via OpenIddict (PKCE flow for CLI/MAUI). Auth protects write endpoints; read endpoints are public. Data layer uses EF Core + SQLite. `Purfle.App` (.NET MAUI) is a desktop app with search, install, agent management, and OAuth authentication — builds for Windows. Web frontend planned via WordPress calling the API. What is not yet built: WordPress marketplace site, publisher verification workflow, usage billing, device attestation.
 
 ---
 

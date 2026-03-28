@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Purfle.App.Pages.MyAgentsPage"
+             Title="My Agents">
+
+    <Grid Padding="16">
+        <CollectionView x:Name="AgentsList"
+                        SelectionMode="None">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="8" ColumnDefinitions="*,Auto,Auto" RowDefinitions="Auto,Auto">
+                        <Label Text="{Binding Name}"
+                               FontAttributes="Bold"
+                               FontSize="16" />
+                        <Label Text="{Binding Version}"
+                               Grid.Column="1"
+                               TextColor="Gray"
+                               FontSize="14"
+                               VerticalOptions="Center" />
+                        <Button Text="Remove"
+                                Grid.Column="2"
+                                BackgroundColor="Transparent"
+                                TextColor="Red"
+                                FontSize="13"
+                                Clicked="OnRemove"
+                                CommandParameter="{Binding AgentId}" />
+                        <Label Text="{Binding ManifestPath}"
+                               Grid.Row="1"
+                               Grid.ColumnSpan="3"
+                               TextColor="Gray"
+                               FontSize="11"
+                               LineBreakMode="MiddleTruncation" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+
+            <CollectionView.EmptyView>
+                <Label Text="No agents installed. Search the marketplace to install agents."
+                       HorizontalOptions="Center"
+                       VerticalOptions="Center"
+                       TextColor="Gray" />
+            </CollectionView.EmptyView>
+        </CollectionView>
+    </Grid>
+
+</ContentPage>

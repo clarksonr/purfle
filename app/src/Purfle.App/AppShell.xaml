@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="Purfle.App.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:Purfle.App.Pages"
+    Title="Purfle Marketplace">
+
+    <TabBar>
+        <ShellContent
+            Title="Search"
+            Icon="{OnPlatform Default='search_icon.png'}"
+            ContentTemplate="{DataTemplate pages:SearchPage}"
+            Route="SearchPage" />
+
+        <ShellContent
+            Title="My Agents"
+            Icon="{OnPlatform Default='agent_icon.png'}"
+            ContentTemplate="{DataTemplate pages:MyAgentsPage}"
+            Route="MyAgentsPage" />
+
+        <ShellContent
+            Title="Settings"
+            Icon="{OnPlatform Default='settings_icon.png'}"
+            ContentTemplate="{DataTemplate pages:SettingsPage}"
+            Route="SettingsPage" />
+    </TabBar>
+
+</Shell>

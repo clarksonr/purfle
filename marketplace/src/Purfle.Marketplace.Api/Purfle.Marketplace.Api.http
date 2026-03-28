@@ -1,0 +1,6 @@
+@Purfle.Marketplace.Api_HostAddress = http://localhost:5037
+
+GET {{Purfle.Marketplace.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Purfle.App.Pages.AgentDetailPage"
+             Title="Agent Details">
+
+    <ScrollView Padding="16">
+        <VerticalStackLayout Spacing="12">
+
+            <Label x:Name="AgentName"
+                   FontSize="24"
+                   FontAttributes="Bold" />
+
+            <Label x:Name="PublisherLabel"
+                   FontSize="14"
+                   TextColor="Gray" />
+
+            <Label x:Name="DescriptionLabel"
+                   FontSize="15" />
+
+            <Button x:Name="InstallButton"
+                    Text="Install Latest"
+                    Clicked="OnInstall"
+                    BackgroundColor="#1a1a2e"
+                    TextColor="White" />
+
+            <Label Text="Versions"
+                   FontSize="18"
+                   FontAttributes="Bold"
+                   Margin="0,12,0,0" />
+
+            <CollectionView x:Name="VersionsList">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="4" ColumnDefinitions="Auto,*,Auto">
+                            <Label Text="{Binding Version}"
+                                   FontAttributes="Bold"
+                                   VerticalOptions="Center" />
+                            <Label Text="{Binding PublishedAt, StringFormat='{0:yyyy-MM-dd}'}"
+                                   Grid.Column="1"
+                                   TextColor="Gray"
+                                   VerticalOptions="Center"
+                                   Margin="12,0,0,0" />
+                            <Label Text="{Binding Downloads, StringFormat='{0} downloads'}"
+                                   Grid.Column="2"
+                                   TextColor="Gray"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
