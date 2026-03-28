@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { simulate } from "./commands/simulate";
+import { initCommand } from "./commands/init";
+import { buildCommand } from "./commands/build";
+import { signCommand } from "./commands/sign";
+import { publishCommand } from "./commands/publish";
 
 const program = new Command();
 
@@ -20,33 +24,38 @@ program
     await simulate(manifest, options);
   });
 
-// Placeholder commands so the CLI feels complete from day one
 program
-  .command("init")
+  .command("init <name>")
   .description("Scaffold a new agent project")
-  .action(() => {
-    console.log("[purfle] init — not yet implemented");
+  .option("-d, --dir <path>", "output directory (defaults to kebab-cased name)")
+  .action((name: string, options: { dir?: string }) => {
+    initCommand(name, options);
   });
 
 program
-  .command("build")
-  .description("Build and bundle an agent")
-  .action(() => {
-    console.log("[purfle] build — not yet implemented");
+  .command("build [dir]")
+  .description("Validate an agent manifest")
+  .action((dir: string = ".") => {
+    buildCommand(dir);
   });
 
 program
-  .command("sign")
-  .description("Sign an agent manifest (JWS)")
-  .action(() => {
-    console.log("[purfle] sign — not yet implemented");
+  .command("sign [dir]")
+  .description("Sign an agent manifest (JWS ES256)")
+  .option("--key-file <path>", "path to existing PEM private key")
+  .option("--key-id <id>", "key identifier")
+  .option("--generate-key", "generate a new P-256 key pair")
+  .action((dir: string = ".", options: { keyFile?: string; keyId?: string; generateKey?: boolean }) => {
+    signCommand(dir, options);
   });
 
 program
-  .command("publish")
-  .description("Publish an agent to the marketplace")
-  .action(() => {
-    console.log("[purfle] publish — not yet implemented");
+  .command("publish [dir]")
+  .description("Publish an agent to the registry")
+  .option("--registry <url>", "registry URL")
+  .option("--register-key <path>", "register public key with the registry")
+  .action((dir: string = ".", options: { registry?: string; registerKey?: string }) => {
+    publishCommand(dir, options);
   });
 
 program.parse(process.argv);

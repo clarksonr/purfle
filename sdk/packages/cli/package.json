@@ -13,6 +13,7 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@purfle/core": "0.1.0",
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1",
     "commander": "^11.1.0"

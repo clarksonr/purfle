@@ -166,7 +166,7 @@ When editing the schema, validate the example manifests against it. The examples
 `Purfle.Runtime` implements the full seven-step load sequence from spec §4: parse → schema validation → JWS identity verification → capability negotiation → permission binding → I/O schema compilation → initialization. 31 tests pass. `Purfle.Runtime.Host` is a runnable demo. What is not yet built: the live key registry API (only `StaticKeyRegistry` exists), `HttpKeyRegistryClient`, audit logging, the OpenClaw/Ollama adapters, and `Lifecycle/` init timeout enforcement. The Anthropic adapter (`Purfle.Runtime.Anthropic`) is functional and requires `ANTHROPIC_API_KEY` listed in the manifest's `permissions.environment.allow`.
 
 **Phase 3 (SDK + Tooling) — In progress.**
-`@purfle/core` has working TypeScript types, ES256 signing/verification, canonical JSON, and manifest validation. `@purfle/cli` has working `init`, `build`, and `sign` commands. Stubs for `publish` and `simulate` are in place but blocked on the registry API and a local engine adapter respectively. Full JSON Schema validation via Ajv and `@purfle/core` tests are pending.
+`@purfle/core` has working TypeScript types, ES256 signing/verification, canonical JSON, and manifest validation. `@purfle/cli` has working `init`, `build`, `sign`, and `simulate` commands wired to real implementations. `publish` is stubbed (blocked on registry API). Full JSON Schema validation via Ajv and `@purfle/core` tests are pending.
 
 **Phase 4 (Marketplace + Devices) — Not started.**
 
