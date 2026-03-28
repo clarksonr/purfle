@@ -1,3 +1,5 @@
+import Ajv from "ajv";
+import addFormats from "ajv-formats";
 import { AgentManifest } from "./manifest.js";
 
 export interface ValidationResult {
@@ -5,67 +7,143 @@ export interface ValidationResult {
   errors: string[];
 }
 
+// Lazily compiled validator — built on first call, then reused.
+let _validate: ReturnType<Ajv["compile"]> | null = null;
+
+function getValidator(): ReturnType<Ajv["compile"]> {
+  if (_validate) return _validate;
+
+  // Inline the identity schema so @purfle/core stays file-system-independent.
+  const identitySchema = {
+    $id: "agent.identity.schema.json",
+    type: "object",
+    required: ["author", "email", "key_id", "algorithm", "issued_at", "expires_at", "signature"],
+    additionalProperties: false,
+    properties: {
+      author:     { type: "string", minLength: 1, maxLength: 256 },
+      email:      { type: "string", format: "email" },
+      key_id:     { type: "string", minLength: 1 },
+      algorithm:  { type: "string", enum: ["ES256"] },
+      issued_at:  { type: "string", format: "date-time" },
+      expires_at: { type: "string", format: "date-time" },
+      signature:  { type: "string" },
+    },
+  };
+
+  const manifestSchema = {
+    $id: "agent.manifest.schema.json",
+    type: "object",
+    required: ["purfle", "id", "name", "version", "description", "identity",
+               "capabilities", "permissions", "lifecycle", "runtime", "io"],
+    additionalProperties: false,
+    properties: {
+      purfle:       { type: "string", pattern: "^\\d+\\.\\d+$" },
+      id:           { type: "string" },
+      name:         { type: "string", minLength: 1 },
+      version:      { type: "string", pattern: "^\\d+\\.\\d+\\.\\d+" },
+      description:  { type: "string", maxLength: 1024 },
+      identity:     { $ref: "agent.identity.schema.json" },
+      capabilities: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["id"],
+          additionalProperties: false,
+          properties: {
+            id:          { type: "string", pattern: "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$" },
+            description: { type: "string" },
+            required:    { type: "boolean" },
+          },
+        },
+      },
+      permissions: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          network: {
+            type: "object", additionalProperties: false,
+            properties: {
+              allow: { type: "array", items: { type: "string" } },
+              deny:  { type: "array", items: { type: "string" } },
+            },
+          },
+          filesystem: {
+            type: "object", additionalProperties: false,
+            properties: {
+              read:  { type: "array", items: { type: "string" } },
+              write: { type: "array", items: { type: "string" } },
+            },
+          },
+          environment: {
+            type: "object", additionalProperties: false,
+            properties: {
+              allow: { type: "array", items: { type: "string" } },
+            },
+          },
+          tools: {
+            type: "object", additionalProperties: false,
+            properties: {
+              mcp: { type: "array", items: { type: "string" } },
+            },
+          },
+        },
+      },
+      lifecycle: {
+        type: "object",
+        required: ["on_error"],
+        additionalProperties: false,
+        properties: {
+          init_timeout_ms: { type: "integer", minimum: 0 },
+          max_runtime_ms:  { type: "integer", minimum: 0 },
+          on_error:        { type: "string", enum: ["terminate", "suspend", "retry"] },
+          restartable:     { type: "boolean" },
+        },
+      },
+      runtime: {
+        type: "object",
+        required: ["requires", "engine"],
+        additionalProperties: false,
+        properties: {
+          requires: { type: "string", pattern: "^purfle/\\d+\\.\\d+$" },
+          engine:   { type: "string", enum: ["openai-compatible", "anthropic", "ollama"] },
+          model:    { type: "string" },
+          adapter:  { type: "string" },
+        },
+      },
+      io: {
+        type: "object",
+        required: ["input", "output"],
+        additionalProperties: false,
+        properties: {
+          input:  { type: "object" },
+          output: { type: "object" },
+        },
+      },
+    },
+  };
+
+  const ajv = new Ajv({ allErrors: true });
+  addFormats(ajv);
+  ajv.addSchema(identitySchema);
+  _validate = ajv.compile(manifestSchema);
+  return _validate;
+}
+
 /**
  * Validates a parsed manifest object against the Purfle manifest schema.
- *
- * v0.1: structural validation only (required fields, enum values, pattern checks).
- * Full JSON Schema (Draft 2020-12) validation via Ajv will be wired in once the
- * dependency is added.
+ * Uses Ajv for full JSON Schema (Draft 2020-12) validation.
  */
 export function validateManifest(manifest: unknown): ValidationResult {
-  const errors: string[] = [];
+  const validate = getValidator();
+  const valid = validate(manifest) as boolean;
 
-  if (typeof manifest !== "object" || manifest === null) {
-    return { valid: false, errors: ["Manifest must be a JSON object."] };
-  }
+  const errors = valid
+    ? []
+    : (validate.errors ?? []).map(
+        (e) => `${e.instancePath || "(root)"} ${e.message}`
+      );
 
-  const m = manifest as Record<string, unknown>;
-
-  if (typeof m.purfle !== "string" || !/^\d+\.\d+$/.test(m.purfle)) {
-    errors.push("purfle: must be a version string matching \\d+.\\d+");
-  }
-  if (typeof m.id !== "string") {
-    errors.push("id: required string (UUID v4)");
-  }
-  if (typeof m.name !== "string" || m.name.length === 0) {
-    errors.push("name: required non-empty string");
-  }
-  if (typeof m.version !== "string" || !/^\d+\.\d+\.\d+/.test(m.version)) {
-    errors.push("version: must be a semver string");
-  }
-  if (typeof m.description !== "string") {
-    errors.push("description: required string");
-  }
-  if (typeof m.identity !== "object" || m.identity === null) {
-    errors.push("identity: required object");
-  }
-  if (!Array.isArray(m.capabilities)) {
-    errors.push("capabilities: required array");
-  }
-  if (typeof m.permissions !== "object" || m.permissions === null) {
-    errors.push("permissions: required object");
-  }
-  if (typeof m.lifecycle !== "object" || m.lifecycle === null) {
-    errors.push("lifecycle: required object");
-  } else {
-    const lc = m.lifecycle as Record<string, unknown>;
-    if (!["terminate", "suspend", "retry"].includes(lc.on_error as string)) {
-      errors.push("lifecycle.on_error: must be terminate | suspend | retry");
-    }
-  }
-  if (typeof m.runtime !== "object" || m.runtime === null) {
-    errors.push("runtime: required object");
-  } else {
-    const rt = m.runtime as Record<string, unknown>;
-    if (!["openai-compatible", "anthropic", "ollama"].includes(rt.engine as string)) {
-      errors.push("runtime.engine: must be openai-compatible | anthropic | ollama");
-    }
-  }
-  if (typeof m.io !== "object" || m.io === null) {
-    errors.push("io: required object");
-  }
-
-  return { valid: errors.length === 0, errors };
+  return { valid, errors };
 }
 
 /** Parses manifest JSON and validates it. Returns the typed manifest or throws. */

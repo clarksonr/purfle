@@ -30,61 +30,38 @@ function validManifestObj(): Record<string, unknown> {
 describe("validateManifest", () => {
   it("accepts a valid manifest", () => {
     const result = validateManifest(validManifestObj());
-    assert.ok(result.valid);
+    assert.ok(result.valid, `errors: ${result.errors.join(", ")}`);
     assert.equal(result.errors.length, 0);
   });
 
-  it("rejects null", () => {
-    const result = validateManifest(null);
-    assert.ok(!result.valid);
-    assert.ok(result.errors[0].includes("JSON object"));
-  });
-
   it("rejects non-object", () => {
-    const result = validateManifest("not an object");
-    assert.ok(!result.valid);
+    assert.ok(!validateManifest("not an object").valid);
+    assert.ok(!validateManifest(null).valid);
+    assert.ok(!validateManifest(42).valid);
   });
 
-  it("rejects missing purfle version", () => {
-    const m = validManifestObj();
-    delete m.purfle;
-    const result = validateManifest(m);
+  it("rejects missing required fields", () => {
+    const result = validateManifest({});
     assert.ok(!result.valid);
-    assert.ok(result.errors.some((e) => e.includes("purfle")));
+    assert.ok(result.errors.length > 0);
   });
 
   it("rejects bad purfle version format", () => {
     const m = validManifestObj();
-    m.purfle = "1.2.3"; // must be \d+.\d+, not semver
-    const result = validateManifest(m);
-    // "1.2.3" matches ^\d+\.\d+ so it passes the regex — that's correct
-    // Only truly bad formats like "abc" should fail
     m.purfle = "abc";
-    const result2 = validateManifest(m);
-    assert.ok(!result2.valid);
-  });
-
-  it("rejects missing name", () => {
-    const m = validManifestObj();
-    delete m.name;
-    const result = validateManifest(m);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some((e) => e.includes("name")));
+    assert.ok(!validateManifest(m).valid);
   });
 
   it("rejects empty name", () => {
     const m = validManifestObj();
     m.name = "";
-    const result = validateManifest(m);
-    assert.ok(!result.valid);
+    assert.ok(!validateManifest(m).valid);
   });
 
   it("rejects bad semver", () => {
     const m = validManifestObj();
     m.version = "not-semver";
-    const result = validateManifest(m);
-    assert.ok(!result.valid);
-    assert.ok(result.errors.some((e) => e.includes("version")));
+    assert.ok(!validateManifest(m).valid);
   });
 
   it("rejects invalid lifecycle.on_error", () => {
@@ -121,10 +98,41 @@ describe("validateManifest", () => {
     }
   });
 
-  it("collects multiple errors", () => {
-    const result = validateManifest({ purfle: 42, name: "" });
+  it("rejects additional properties", () => {
+    const m = { ...validManifestObj(), extra: "nope" };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("validates identity block fields", () => {
+    const m = validManifestObj();
+    (m.identity as Record<string, unknown>).algorithm = "RS256";
+    const result = validateManifest(m);
     assert.ok(!result.valid);
-    assert.ok(result.errors.length > 2);
+    assert.ok(result.errors.some((e) => e.includes("algorithm")));
+  });
+
+  it("validates identity email format", () => {
+    const m = validManifestObj();
+    (m.identity as Record<string, unknown>).email = "not-an-email";
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("validates runtime.requires pattern", () => {
+    const m = validManifestObj();
+    (m.runtime as Record<string, unknown>).requires = "0.1";
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("validates capability id pattern", () => {
+    const m = validManifestObj();
+    m.capabilities = [{ id: "Valid-No-Uppercase" }];
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("collects multiple errors", () => {
+    const result = validateManifest({});
+    assert.ok(!result.valid);
+    assert.ok(result.errors.length > 1);
   });
 });
 

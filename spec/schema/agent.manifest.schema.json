@@ -1,81 +1,200 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://purfle.dev/schema/agent.manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://purfle.dev/schema/0.1/agent.manifest.schema.json",
   "title": "Purfle Agent Manifest",
   "description": "Defines the identity, capabilities, permissions, and lifecycle of a Purfle agent.",
   "type": "object",
-  "required": ["specVersion", "identity", "lifecycle"],
+  "required": ["purfle", "id", "name", "version", "description", "identity", "capabilities", "permissions", "lifecycle", "runtime", "io"],
   "additionalProperties": false,
   "properties": {
-    "$schema": {
-      "type": "string"
-    },
-    "specVersion": {
+    "purfle": {
       "type": "string",
-      "description": "Version of the Purfle manifest spec this file conforms to.",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+      "description": "Spec version the manifest targets.",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "id": {
+      "type": "string",
+      "description": "UUID v4. Globally unique manifest identifier."
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable agent name.",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of this agent.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+"
+    },
+    "description": {
+      "type": "string",
+      "description": "What the agent does.",
+      "maxLength": 1024
     },
     "identity": {
-      "$ref": "#/definitions/identity"
+      "$ref": "agent.identity.schema.json"
     },
     "capabilities": {
       "type": "array",
-      "description": "Declared capabilities this agent exposes.",
-      "items": { "type": "string" },
-      "default": []
+      "description": "Runtime service requirements.",
+      "items": {
+        "$ref": "#/$defs/capability"
+      }
     },
     "permissions": {
-      "type": "array",
-      "description": "Permissions this agent requests from the host runtime.",
-      "items": { "type": "string" },
-      "default": []
+      "$ref": "#/$defs/permissions"
     },
     "lifecycle": {
-      "$ref": "#/definitions/lifecycle"
+      "$ref": "#/$defs/lifecycle"
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtime"
+    },
+    "io": {
+      "$ref": "#/$defs/io"
     }
   },
-  "definitions": {
-    "identity": {
+  "$defs": {
+    "capability": {
       "type": "object",
-      "required": ["id", "name", "version"],
+      "required": ["id"],
       "additionalProperties": false,
       "properties": {
         "id": {
           "type": "string",
-          "description": "Globally unique agent identifier. Recommended: URN form urn:purfle:agent:<name>.",
-          "pattern": "^urn:purfle:agent:[a-z0-9_-]+(:[a-z0-9_-]+)*$"
+          "description": "Capability identifier.",
+          "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$"
         },
-        "name": {
+        "description": {
           "type": "string",
-          "description": "Human-readable agent name.",
-          "minLength": 1,
-          "maxLength": 64
+          "description": "Why the agent needs this capability."
         },
-        "version": {
-          "type": "string",
-          "description": "Semantic version of this agent.",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        "required": {
+          "type": "boolean",
+          "description": "If true, load fails when capability is absent.",
+          "default": false
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "description": "Resource access grants defining the agent sandbox.",
+      "additionalProperties": false,
+      "properties": {
+        "network": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "deny": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
         },
-        "publisher": {
-          "type": "string",
-          "description": "Publisher identifier (GitHub handle, org name, or DID).",
-          "minLength": 1
+        "filesystem": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "read": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "write": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mcp": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
         }
       }
     },
     "lifecycle": {
       "type": "object",
-      "required": ["entrypoint"],
+      "required": ["on_error"],
       "additionalProperties": false,
       "properties": {
-        "entrypoint": {
-          "type": "string",
-          "description": "Path to the agent's main executable or script, relative to repo root."
+        "init_timeout_ms": {
+          "type": "integer",
+          "description": "Max milliseconds from load to ready.",
+          "minimum": 0
         },
-        "runtime": {
+        "max_runtime_ms": {
+          "type": "integer",
+          "description": "Max milliseconds per invocation. 0 = no limit.",
+          "minimum": 0
+        },
+        "on_error": {
           "type": "string",
-          "description": "Runtime hint for the host (e.g. 'node', 'dotnet', 'python').",
-          "enum": ["node", "dotnet", "python", "wasm"]
+          "description": "AIVM behavior on agent error.",
+          "enum": ["terminate", "suspend", "retry"]
+        },
+        "restartable": {
+          "type": "boolean",
+          "description": "Whether the AIVM may restart the agent on clean exit.",
+          "default": false
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["requires", "engine"],
+      "additionalProperties": false,
+      "properties": {
+        "requires": {
+          "type": "string",
+          "description": "Minimum Purfle spec version.",
+          "pattern": "^purfle/\\d+\\.\\d+$"
+        },
+        "engine": {
+          "type": "string",
+          "description": "Inference engine interface.",
+          "enum": ["openai-compatible", "anthropic", "ollama"]
+        },
+        "model": {
+          "type": "string",
+          "description": "Model identifier passed to the engine."
+        },
+        "adapter": {
+          "type": "string",
+          "description": "Runtime adapter hint."
+        }
+      }
+    },
+    "io": {
+      "type": "object",
+      "required": ["input", "output"],
+      "additionalProperties": false,
+      "properties": {
+        "input": {
+          "type": "object",
+          "description": "JSON Schema fragment for agent input."
+        },
+        "output": {
+          "type": "object",
+          "description": "JSON Schema fragment for agent output."
         }
       }
     }

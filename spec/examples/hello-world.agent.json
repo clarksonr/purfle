@@ -1,11 +1,17 @@
 {
-  "$schema": "../../spec/schema/agent.manifest.schema.json",
-  "specVersion": "0.1.0",
+  "purfle": "0.1",
+  "id": "11111111-1111-4111-a111-111111111111",
+  "name": "Hello World",
+  "version": "0.1.0",
+  "description": "Minimal agent for local demonstration. No required capabilities beyond implicit inference.",
   "identity": {
-    "id": "urn:purfle:agent:hello-world",
-    "name": "hello-world",
-    "version": "0.1.0",
-    "publisher": "clarksonr"
+    "author": "clarksonr",
+    "email": "roman@example.com",
+    "key_id": "hello-key-001",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-27T00:00:00Z",
+    "expires_at": "2027-03-27T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImhlbGxvLWtleS0wMDEifQ.PLACEHOLDER.PLACEHOLDER"
   },
   "capabilities": [],
   "permissions": {
@@ -14,7 +20,26 @@
     }
   },
   "lifecycle": {
-    "entrypoint": "spec/examples/hello.js",
-    "runtime": "node"
+    "on_error": "terminate"
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic"
+  },
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" }
+      },
+      "required": ["message"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "response": { "type": "string" }
+      },
+      "required": ["response"]
+    }
   }
 }

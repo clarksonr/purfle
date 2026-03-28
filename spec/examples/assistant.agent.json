@@ -1,21 +1,48 @@
 {
-  "$schema": "../../spec/schema/agent.manifest.schema.json",
-  "specVersion": "0.1.0",
+  "purfle": "0.1",
+  "id": "55555555-5555-4555-a555-555555555555",
+  "name": "Assistant",
+  "version": "0.1.0",
+  "description": "Chat assistant agent using the Anthropic engine.",
   "identity": {
-    "id": "urn:purfle:agent:assistant",
-    "name": "assistant",
-    "version": "0.1.0",
-    "publisher": "clarksonr"
+    "author": "clarksonr",
+    "email": "roman@example.com",
+    "key_id": "assistant-key-001",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-27T00:00:00Z",
+    "expires_at": "2027-03-27T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImFzc2lzdGFudC1rZXktMDAxIn0.PLACEHOLDER.PLACEHOLDER"
   },
-  "capabilities": [
-    "llm.chat"
-  ],
-  "permissions": [
-    "network.outbound",
-    "env.ANTHROPIC_API_KEY"
-  ],
+  "capabilities": [],
+  "permissions": {
+    "network": {
+      "allow": ["https://api.anthropic.com/*"]
+    },
+    "environment": {
+      "allow": ["ANTHROPIC_API_KEY"]
+    }
+  },
   "lifecycle": {
-    "entrypoint": "spec/examples/assistant.js",
-    "runtime": "node"
+    "on_error": "terminate"
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic"
+  },
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" }
+      },
+      "required": ["message"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "response": { "type": "string" }
+      },
+      "required": ["response"]
+    }
   }
 }
