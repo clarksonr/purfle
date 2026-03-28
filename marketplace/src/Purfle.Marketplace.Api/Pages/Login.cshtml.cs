@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Purfle.Marketplace.Data.Entities;
+using Purfle.Marketplace.Core.Entities;
 
 namespace Purfle.Marketplace.Api.Pages;
 

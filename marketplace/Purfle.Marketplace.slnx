@@ -1,7 +1,8 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Purfle.Marketplace.Api/Purfle.Marketplace.Api.csproj" />
-    <Project Path="src/Purfle.Marketplace.Data/Purfle.Marketplace.Data.csproj" />
+    <Project Path="src/Purfle.Marketplace.Core/Purfle.Marketplace.Core.csproj" />
     <Project Path="src/Purfle.Marketplace.Shared/Purfle.Marketplace.Shared.csproj" />
+    <Project Path="src/Purfle.Marketplace.Storage.Json/Purfle.Marketplace.Storage.Json.csproj" />
   </Folder>
 </Solution>

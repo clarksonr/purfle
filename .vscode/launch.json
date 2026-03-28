@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Marketplace API",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-marketplace",
+      "program": "${workspaceFolder}/marketplace/src/Purfle.Marketplace.Api/bin/Debug/net10.0/Purfle.Marketplace.Api.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/marketplace/src/Purfle.Marketplace.Api",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "console": "internalConsole"
+    }
+  ]
+}

@@ -1,12 +1,8 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
 using Purfle.Marketplace.Api.Services;
-using Purfle.Marketplace.Core.Repositories;
-using Purfle.Marketplace.Core.Storage;
-using Purfle.Marketplace.Data;
-using Purfle.Marketplace.Data.Entities;
-using Purfle.Marketplace.Data.Repositories;
+using Purfle.Marketplace.Core.Entities;
+using Purfle.Marketplace.Storage.Json;
 using Purfle.Runtime.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,30 +11,19 @@ builder.Services.AddControllers();
 builder.Services.AddRazorPages();
 builder.Services.AddOpenApi();
 
-// Repository interfaces backed by EF Core (transitional)
-builder.Services.AddScoped<IPublisherRepository, EfPublisherRepository>();
-builder.Services.AddScoped<ISigningKeyRepository, EfSigningKeyRepository>();
-builder.Services.AddScoped<IAgentListingRepository, EfAgentListingRepository>();
-builder.Services.AddScoped<IAgentVersionRepository, EfAgentVersionRepository>();
-builder.Services.AddSingleton<IManifestBlobStore, EfManifestBlobStore>();
+// Storage — JSON file-backed repositories, identity stores, and OpenIddict stores.
+builder.Services.AddJsonStorage(builder.Configuration);
+
+// Key registry — bridges the signing key repository to the runtime identity verifier.
 builder.Services.AddScoped<IKeyRegistry, DbKeyRegistry>();
 
-// EF Core + SQLite
-builder.Services.AddDbContext<MarketplaceDbContext>(options =>
-{
-    options.UseSqlite(builder.Configuration.GetConnectionString("Marketplace")
-        ?? "Data Source=marketplace.db");
-    options.UseOpenIddict();
-});
-
-// ASP.NET Identity
+// ASP.NET Identity — user/role stores already registered by AddJsonStorage.
 builder.Services.AddIdentity<Publisher, IdentityRole>(options =>
 {
     options.Password.RequiredLength = 8;
     options.Password.RequireNonAlphanumeric = false;
     options.User.RequireUniqueEmail = true;
 })
-.AddEntityFrameworkStores<MarketplaceDbContext>()
 .AddDefaultTokenProviders();
 
 // Configure cookie for Identity login page (used during OAuth flow).
@@ -47,12 +32,11 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = "/login";
 });
 
-// OpenIddict — OAuth2/OIDC server
+// OpenIddict — OAuth2/OIDC server backed by JSON stores.
 builder.Services.AddOpenIddict()
     .AddCore(options =>
     {
-        options.UseEntityFrameworkCore()
-            .UseDbContext<MarketplaceDbContext>();
+        options.UseJsonStores();
     })
     .AddServer(options =>
     {
@@ -82,7 +66,7 @@ builder.Services.AddOpenIddict()
         options.UseAspNetCore();
     });
 
-// CORS for localhost development
+// CORS for localhost development.
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -95,13 +79,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Auto-create database on startup.
+// Seed the OpenIddict application for CLI/MAUI clients on first run.
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<MarketplaceDbContext>();
-    db.Database.EnsureCreated();
-
-    // Seed the OpenIddict application for CLI/MAUI clients.
     var appManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
     if (await appManager.FindByClientIdAsync("purfle-cli") is null)
     {

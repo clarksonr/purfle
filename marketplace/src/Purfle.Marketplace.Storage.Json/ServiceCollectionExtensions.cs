@@ -31,9 +31,10 @@ public static class ServiceCollectionExtensions
         // Blob store
         if (manifestStore == "Azure")
         {
-            // Azure blob store will be registered in Step 6
-            throw new InvalidOperationException(
-                "Azure Blob Storage is not yet configured. Use 'Local' for ManifestStore.");
+            var connectionString = configuration["AzureBlobStorage:ConnectionString"]
+                ?? throw new InvalidOperationException("AzureBlobStorage:ConnectionString is required when ManifestStore is 'Azure'.");
+            var containerName = configuration["AzureBlobStorage:ContainerName"] ?? "purfle-manifests";
+            services.AddSingleton<IManifestBlobStore>(new AzureBlobStore(connectionString, containerName));
         }
         else
         {
@@ -56,22 +57,25 @@ public static class ServiceCollectionExtensions
     public static OpenIddictCoreBuilder UseJsonStores(this OpenIddictCoreBuilder builder)
     {
         builder.Services.AddSingleton(
-            typeof(OpenIddict.Abstractions.IOpenIddictApplicationStore<>).MakeGenericType(typeof(OpenIddictJsonApplication)),
+            typeof(global::OpenIddict.Abstractions.IOpenIddictApplicationStore<>).MakeGenericType(typeof(OpenIddictJsonApplication)),
             sp => sp.GetRequiredService<JsonApplicationStore>());
 
         builder.Services.AddSingleton(
-            typeof(OpenIddict.Abstractions.IOpenIddictAuthorizationStore<>).MakeGenericType(typeof(OpenIddictJsonAuthorization)),
+            typeof(global::OpenIddict.Abstractions.IOpenIddictAuthorizationStore<>).MakeGenericType(typeof(OpenIddictJsonAuthorization)),
             sp => sp.GetRequiredService<JsonAuthorizationStore>());
 
         builder.Services.AddSingleton(
-            typeof(OpenIddict.Abstractions.IOpenIddictScopeStore<>).MakeGenericType(typeof(OpenIddictJsonScope)),
+            typeof(global::OpenIddict.Abstractions.IOpenIddictScopeStore<>).MakeGenericType(typeof(OpenIddictJsonScope)),
             sp => sp.GetRequiredService<JsonScopeStore>());
 
         builder.Services.AddSingleton(
-            typeof(OpenIddict.Abstractions.IOpenIddictTokenStore<>).MakeGenericType(typeof(OpenIddictJsonToken)),
+            typeof(global::OpenIddict.Abstractions.IOpenIddictTokenStore<>).MakeGenericType(typeof(OpenIddictJsonToken)),
             sp => sp.GetRequiredService<JsonTokenStore>());
 
-        builder.ReplaceDefaultEntities<OpenIddictJsonApplication, OpenIddictJsonAuthorization, OpenIddictJsonScope, OpenIddictJsonToken, string>();
+        builder.SetDefaultApplicationEntity<OpenIddictJsonApplication>()
+               .SetDefaultAuthorizationEntity<OpenIddictJsonAuthorization>()
+               .SetDefaultScopeEntity<OpenIddictJsonScope>()
+               .SetDefaultTokenEntity<OpenIddictJsonToken>();
 
         return builder;
     }

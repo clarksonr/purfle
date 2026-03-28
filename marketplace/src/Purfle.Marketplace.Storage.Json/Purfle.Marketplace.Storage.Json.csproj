@@ -11,9 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.23.0" />
     <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="10.0.5" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.16.0" />
     <PackageReference Include="OpenIddict.Abstractions" Version="7.4.0" />
+    <PackageReference Include="OpenIddict.Core" Version="7.4.0" />
   </ItemGroup>
 
 </Project>

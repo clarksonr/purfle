@@ -11,3 +11,6 @@ obj/
 # Node
 node_modules/
 sdk/packages/*/dist/
+
+# Marketplace runtime data (OpenIddict state, JSON storage)
+marketplace/src/Purfle.Marketplace.Api/data/

@@ -7,15 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
     <PackageReference Include="OpenIddict.AspNetCore" Version="7.4.0" />
-    <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.4.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Purfle.Marketplace.Core\Purfle.Marketplace.Core.csproj" />
-    <ProjectReference Include="..\Purfle.Marketplace.Data\Purfle.Marketplace.Data.csproj" />
     <ProjectReference Include="..\Purfle.Marketplace.Shared\Purfle.Marketplace.Shared.csproj" />
     <ProjectReference Include="..\Purfle.Marketplace.Storage.Json\Purfle.Marketplace.Storage.Json.csproj" />
     <ProjectReference Include="..\..\..\runtime\src\Purfle.Runtime\Purfle.Runtime.csproj" />

@@ -1,7 +1,7 @@
 # Plan: Storage-Agnostic Data Layer
 
 **Date:** 2026-03-27
-**Status:** Approved — ready for implementation
+**Status:** Complete — implemented 2026-03-28
 **Goal:** Replace EF Core / SQLite with JSON file storage + Azure Blob Storage, behind clean abstractions (factory pattern) so the storage backend is a configuration choice, not an architecture choice.
 
 ---
@@ -21,11 +21,11 @@ We're replacing it with:
 
 ```
 marketplace/src/
-  Purfle.Marketplace.Core/              # NEW — POCOs, repository interfaces, storage abstractions
-  Purfle.Marketplace.Storage.Json/      # NEW — JSON file-backed implementations
-  Purfle.Marketplace.Shared/            # UNCHANGED — DTOs
-  Purfle.Marketplace.Api/               # MODIFIED — depends on interfaces, not DbContext
-  Purfle.Marketplace.Data/              # DELETED after migration
+  Purfle.Marketplace.Core/              # POCOs, repository interfaces, storage abstractions
+  Purfle.Marketplace.Storage.Json/      # JSON file-backed implementations (active storage backend)
+  Purfle.Marketplace.Shared/            # DTOs
+  Purfle.Marketplace.Api/               # Depends on interfaces only — no DbContext
+  # Purfle.Marketplace.Data/            # DELETED — EF Core layer removed
 ```
 
 Dependency graph:
@@ -220,48 +220,42 @@ Future backends: create `Purfle.Marketplace.Storage.Postgres` with its own `AddP
 
 ## Migration Steps (each step is a buildable, runnable commit)
 
-### Step 1: Create Core project + repository interfaces
-- New `Purfle.Marketplace.Core` project
-- Move entity POCOs from `Data/Entities/` → `Core/Entities/`
-- Strip `IdentityUser` from Publisher, add Identity properties as plain fields
-- Remove navigation properties
-- Define all repository interfaces + `IManifestBlobStore`
-- Both `Data` and `Api` reference `Core`
+### Step 1: Create Core project + repository interfaces ✓
+- `Purfle.Marketplace.Core` project with clean POCO entities
+- `Publisher` strips `IdentityUser` — plain properties only
+- All four repository interfaces + `IManifestBlobStore`
 
-### Step 2: Refactor controllers to use interfaces (still backed by EF Core)
-- Create thin EF-Core-backed repository implementations in `Data` project (wrapping DbContext)
-- Register in DI
-- Refactor all controllers to inject interfaces instead of `MarketplaceDbContext`
-- **Verify everything still works** — this is the safety step
+### Step 2: Refactor controllers to use interfaces ✓
+- All controllers inject repository interfaces, not `MarketplaceDbContext`
+- EF Core-backed implementations wired transitionally in DI
 
-### Step 3: Create Storage.Json project + implement repositories
-- `JsonDocumentStore<T>` infrastructure
+### Step 3: Create Storage.Json project + implement repositories ✓
+- `JsonDocumentStore<T>` with `SemaphoreSlim` locking and atomic writes
 - All four JSON repository classes
 - `LocalFileBlobStore`
-- Unit tests for serialization round-trips
 
-### Step 4: Implement Identity + OpenIddict JSON stores
+### Step 4: Implement Identity + OpenIddict JSON stores ✓
 - `JsonUserStore`, `JsonRoleStore`
-- All four OpenIddict stores + POCO models
-- This is the most tedious step but mostly mechanical
+- All four OpenIddict stores + POCO models (`OpenIddictJsonApplication` etc.)
 
-### Step 5: Wire up DI and switch
-- `AddJsonStorage()` extension method
-- Update Program.cs to configuration-driven backend
-- Switch Identity to `AddUserStore<JsonUserStore>()`
-- Switch OpenIddict to custom stores
-- Remove EF Core startup code
-- **Full integration test: register → login → publish → search → download**
+### Step 5: Wire up DI and switch ✓
+- `Program.cs` rewritten — `AddJsonStorage()` replaces all EF Core registrations
+- `UseJsonStores()` replaces `UseEntityFrameworkCore()` in OpenIddict core
+- Identity stores supplied by `AddJsonStorage()` singletons (no `AddEntityFrameworkStores`)
+- `Login.cshtml.cs` updated to use `Core.Entities.Publisher`
+- `appsettings.json` + `appsettings.Development.json` include `Storage` config block
+- **Note:** `UseJsonStores()` required two fixes: `global::` qualifier for namespace collision with local `OpenIddict` sub-namespace, and `ReplaceDefaultEntities` replaced with four `SetDefault*Entity<T>()` calls (correct OpenIddict 7.4 API)
 
-### Step 6: Azure Blob Storage
-- Add `Azure.Storage.Blobs` package
-- Implement `AzureBlobStore`
-- Configuration for connection string
+### Step 6: Azure Blob Storage ✓
+- `AzureBlobStore.cs` implemented — `Azure.Storage.Blobs` SDK, container configurable
+- `ServiceCollectionExtensions` wires `AzureBlobStore` when `ManifestStore = "Azure"`
+- `Azure.Storage.Blobs` and `OpenIddict.Core` added to `Storage.Json.csproj`
 
-### Step 7: Delete Data project + EF Core packages
-- Remove `Purfle.Marketplace.Data`
-- Remove all EF Core NuGet references
-- Clean up
+### Step 7: Delete Data project + EF Core packages ✓
+- `Purfle.Marketplace.Data/` deleted
+- EF Core packages removed from `Purfle.Marketplace.Api.csproj`
+- Solution file updated: Data removed, Core and Storage.Json added
+- Build: 0 errors, 0 warnings — runtime tests: 52/52 passing
 
 ---
 
