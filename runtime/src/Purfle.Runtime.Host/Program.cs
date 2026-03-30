@@ -2,10 +2,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Purfle.Runtime;
+using Purfle.Runtime.Anthropic;
 using Purfle.Runtime.Host;
 using Purfle.Runtime.Identity;
 using Purfle.Runtime.Manifest;
 using Purfle.Runtime.Sandbox;
+using Purfle.Runtime.Sessions;
 
 // ── Generate a signing key ────────────────────────────────────────────────────
 
@@ -93,9 +95,9 @@ else
 
 Console.WriteLine();
 
-// ── Invoke the agent ──────────────────────────────────────────────────────────
+// ── Invoke the agent (single-turn) ───────────────────────────────────────────
 
-Console.WriteLine("--- Invocation ---");
+Console.WriteLine("--- Single-turn invocation ---");
 Console.WriteLine();
 Console.WriteLine("[invoke] Sending message to agent...");
 
@@ -104,6 +106,27 @@ var reply = await result.Adapter!.InvokeAsync(
     userMessage:  "Say hello and describe yourself in one sentence.");
 
 Console.WriteLine($"[agent]  {reply}");
+Console.WriteLine();
+
+// ── Multi-turn conversation demo ─────────────────────────────────────────────
+
+Console.WriteLine("--- Multi-turn conversation demo ---");
+Console.WriteLine();
+
+var session = new ConversationSession(
+    result.Adapter!,
+    "You are a helpful assistant running inside the Purfle AIVM. Be concise. " +
+    "Remember what the user says across turns.");
+
+Console.WriteLine("[session] Turn 1...");
+var reply1 = await session.SendAsync("My name is Roman and I like violins.");
+Console.WriteLine($"[agent]   {reply1}");
+Console.WriteLine();
+
+Console.WriteLine("[session] Turn 2...");
+var reply2 = await session.SendAsync("What is my name and what do I like?");
+Console.WriteLine($"[agent]   {reply2}");
+Console.WriteLine($"[session] Turns completed: {session.TurnCount}");
 Console.WriteLine();
 
 // ── Tamper demo ───────────────────────────────────────────────────────────────

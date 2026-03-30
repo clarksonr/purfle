@@ -12,4 +12,8 @@ public sealed class OllamaAdapter : IInferenceAdapter
 
     public Task<string> InvokeAsync(string systemPrompt, string userMessage, CancellationToken ct = default)
         => throw new NotImplementedException("Ollama adapter not yet implemented.");
+
+    public Task<(string Reply, List<object> UpdatedHistory)> InvokeMultiTurnAsync(
+        string systemPrompt, List<object> conversationHistory, string userMessage, CancellationToken ct = default)
+        => throw new NotImplementedException("Ollama adapter not yet implemented.");
 }

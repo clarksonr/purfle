@@ -8,46 +8,47 @@ We have been building Purfle — a signed AI agent identity and trust platform. 
 
 ## What we built this session
 
-1. **Sample agents** (`agents/` folder)
-   - `agents/chat.agent.json` — minimal chat agent, env key only, no OS access
-   - `agents/file-summarizer.agent.json` — reads `C:/Users/**/*.txt|md|pdf`, declares `filesystem-read` capability
+1. **MCP server wiring** (`runtime/src/Purfle.Runtime/Mcp/`)
+   - `IMcpClient` interface — `ListToolsAsync()` discovers tools, `CallToolAsync()` invokes them
+   - `McpClient` implementation — launches an MCP server as a child process, communicates via JSON-RPC 2.0 over stdio, handles the `initialize` handshake, tool listing, and tool invocation
+   - `McpToolInfo` record — name, description, input schema JSON
 
-2. **Seeder** (`tools/Purfle.Agents.Seeder/`)
-   - .NET console app that generates a P-256 key, signs both manifests, and writes publishers/signing-keys/agent-listings/agent-versions JSON files + manifest blobs directly to the marketplace data directory
-   - Run with: `dotnet run --project tools/Purfle.Agents.Seeder`
-   - After seeding, `GET http://localhost:5000/api/agents` returns both agents
+2. **MCP integration in AnthropicAdapter** (`runtime/src/Purfle.Runtime.Anthropic/AnthropicAdapter.cs`)
+   - Constructor accepts optional `IReadOnlyList<IMcpClient>` — discovers tools from each, filters through `sandbox.CanUseMcpTool()`, builds Anthropic tool definitions
+   - `_mcpToolRoutes` dictionary maps tool name → owning MCP client for dispatch
+   - `ExecuteToolAsync()` routes unknown tool names to MCP clients (with sandbox re-check)
+   - `AdapterFactory` passes MCP clients through to the adapter
 
-3. **Tool-call loop** (`runtime/src/Purfle.Runtime.Anthropic/AnthropicAdapter.cs`)
-   - `AnthropicAdapter` now inspects the sandbox on construction and builds a tool list
-   - `read_file` tool offered when `permissions.filesystem.read` is non-empty
-   - `write_file` tool offered when `permissions.filesystem.write` is non-empty
-   - `http_get` tool offered when `permissions.network.allow` is non-empty
-   - `InvokeAsync` runs a tool-call loop (max 10 iterations): posts tools to Claude API, executes `tool_use` blocks with sandbox checks before every file/network access, feeds results back until `end_turn`
-   - Agents with no OS permissions (chat agent) take the original single-turn path unchanged
-   - Build: clean. Tests: 52/52 pass.
+3. **Conversation history** (`runtime/src/Purfle.Runtime/Sessions/ConversationSession.cs`)
+   - `ConversationSession` wraps any `IInferenceAdapter` and accumulates message history
+   - `SendAsync()` calls `InvokeMultiTurnAsync()` with the full history, appends the new turn
+   - `Reset()` clears history for a fresh session
+   - `TurnCount` tracks how many turns have occurred
+   - `IInferenceAdapter` now has `InvokeMultiTurnAsync()` for multi-turn support
+   - `AnthropicAdapter.InvokeMultiTurnAsync()` sends full history + tools in every request
+
+4. **Host demo updated** (`runtime/src/Purfle.Runtime.Host/Program.cs`)
+   - Added multi-turn conversation demo after the single-turn invocation
+   - Demonstrates that the model retains context across turns via `ConversationSession`
 
 ## What is not yet built (priority order)
 
-1. **MCP server wiring** — `permissions.tools.mcp` is declared and sandbox-checked but the adapter does not yet connect to external MCP servers. The tool-call loop currently handles file/network inline. True MCP integration (connecting to a running MCP server process) is the next step.
+1. **MCP end-to-end test** — The MCP wiring compiles and builds but needs a real MCP server to test against. Try with `npx -y @modelcontextprotocol/server-filesystem /tmp` or a custom MCP server. Create a test agent manifest with `permissions.tools.mcp` entries to exercise the full path.
 
-2. **Conversation history** — `InvokeAsync` is stateless. Each call starts fresh. Multi-turn conversation (passing prior messages back) needs a session/context layer above the adapter.
+2. **Streaming** — The Anthropic adapter uses the blocking Messages API. Streaming responses (`text-delta` events) are not yet wired.
 
-3. **Streaming** — The Anthropic adapter uses the blocking Messages API. Streaming responses (`text-delta` events) are not yet wired.
+3. **Audit logging** — Every sandbox permission check should be logged with agent ID, timestamp, and outcome. Not yet built.
 
-4. **Audit logging** — Every sandbox permission check should be logged with agent ID, timestamp, and outcome. Not yet built.
+4. **OpenClaw / Ollama adapters** — `Purfle.Runtime.OpenClaw` and `Purfle.Runtime.Ollama` exist as stubs but are not functional. Both now implement `InvokeMultiTurnAsync` (throws `NotImplementedException`).
 
-5. **OpenClaw / Ollama adapters** — `Purfle.Runtime.OpenClaw` and `Purfle.Runtime.Ollama` exist as stubs but are not functional.
+5. **WordPress marketplace site** — The API is complete but the public-facing web front end is not built.
 
-6. **WordPress marketplace site** — The API is complete but the public-facing web front end is not built.
-
-7. **Publisher verification workflow** — Any user can register as a publisher. A verification/approval step is not yet built.
+6. **Publisher verification workflow** — Any user can register as a publisher. A verification/approval step is not yet built.
 
 ## Suggested next task
 
-Wire MCP server support into the tool-call loop. The `AgentSandbox.CanUseMcpTool(toolId)` check already exists. The next step is:
-- Define an `IMcpClient` interface (connect to an MCP server, list tools, call a tool)
-- Inject available MCP clients into `AnthropicAdapter` (keyed by tool ID)
-- In `BuildTools()`, also advertise tools from connected MCP servers that pass `sandbox.CanUseMcpTool()`
-- In `ExecuteToolAsync()`, route unrecognised tool names to the appropriate MCP client
+Test MCP end-to-end: create a sample agent manifest that declares MCP tools, launch an MCP server, and verify the full tool-call loop works through the sandbox.
 
-Or alternatively: tackle conversation history — add a `ConversationSession` wrapper that holds message history and calls `InvokeAsync` with accumulated context.
+Or: tackle streaming — switch the Anthropic adapter from `messages` to `messages` with `stream: true`, yield `text-delta` events, and provide a streaming variant of `InvokeAsync`.
+
+Or: build audit logging — add an `IAuditLog` interface, inject it into `AgentSandbox` or the adapter, and log every permission check with agent ID + timestamp + outcome.
