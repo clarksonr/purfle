@@ -13,14 +13,10 @@
     "expires_at": "2027-03-27T00:00:00Z",
     "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImFzc2lzdGFudC1rZXktMDAxIn0.PLACEHOLDER.PLACEHOLDER"
   },
-  "capabilities": [],
+  "capabilities": ["llm.chat", "network.outbound", "env.read"],
   "permissions": {
-    "network": {
-      "allow": ["https://api.anthropic.com/*"]
-    },
-    "environment": {
-      "allow": ["ANTHROPIC_API_KEY"]
-    }
+    "network.outbound": { "hosts": ["api.anthropic.com"] },
+    "env.read": { "vars": ["ANTHROPIC_API_KEY"] }
   },
   "lifecycle": {
     "on_error": "terminate"
@@ -28,21 +24,5 @@
   "runtime": {
     "requires": "purfle/0.1",
     "engine": "anthropic"
-  },
-  "io": {
-    "input": {
-      "type": "object",
-      "properties": {
-        "message": { "type": "string" }
-      },
-      "required": ["message"]
-    },
-    "output": {
-      "type": "object",
-      "properties": {
-        "response": { "type": "string" }
-      },
-      "required": ["response"]
-    }
   }
 }

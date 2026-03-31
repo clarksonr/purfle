@@ -3,18 +3,30 @@
  * Mirror the JSON Schema in spec/schema/agent.manifest.schema.json.
  */
 
+/** Phase-1 capability identifiers. */
+export type CapabilityString =
+  | "llm.chat"
+  | "llm.completion"
+  | "network.outbound"
+  | "env.read"
+  | "fs.read"
+  | "fs.write"
+  | "mcp.tool";
+
 export interface AgentManifest {
   purfle: string;
   id: string;
   name: string;
   version: string;
-  description: string;
+  description?: string;
   identity: AgentIdentity;
-  capabilities: AgentCapability[];
-  permissions: AgentPermissions;
-  lifecycle: AgentLifecycle;
+  capabilities: CapabilityString[];
+  permissions?: AgentPermissions;
+  lifecycle?: AgentLifecycle;
   runtime: AgentRuntime;
-  io: AgentIo;
+  tools?: ToolBinding[];
+  /** Optional input/output schema hints. No enforcement in phase 1. */
+  io?: Record<string, unknown>;
 }
 
 export interface AgentIdentity {
@@ -24,58 +36,40 @@ export interface AgentIdentity {
   algorithm: "ES256";
   issued_at: string;   // ISO 8601
   expires_at: string;  // ISO 8601
-  signature: string;   // JWS compact serialization
+  /** JWS compact serialization. Absent at authoring time; added by the SDK on publish. */
+  signature?: string;
 }
 
-export interface AgentCapability {
-  id: string;
-  description?: string;
-  required?: boolean;
-}
+export interface NetworkOutboundConfig { hosts: string[]; }
+export interface EnvReadConfig { vars: string[]; }
+export interface FsConfig { paths: string[]; }
+export type EmptyPermConfig = Record<string, never>;
 
 export interface AgentPermissions {
-  network?: {
-    allow?: string[];
-    deny?: string[];
-  };
-  filesystem?: {
-    read?: string[];
-    write?: string[];
-  };
-  environment?: {
-    allow?: string[];
-  };
-  tools?: {
-    mcp?: string[];
-  };
+  "llm.chat"?:        EmptyPermConfig;
+  "llm.completion"?:  EmptyPermConfig;
+  "network.outbound"?: NetworkOutboundConfig;
+  "env.read"?:        EnvReadConfig;
+  "fs.read"?:         FsConfig;
+  "fs.write"?:        FsConfig;
+  "mcp.tool"?:        EmptyPermConfig;
 }
 
 export interface AgentLifecycle {
-  init_timeout_ms?: number;
-  max_runtime_ms?: number;
-  on_error: "terminate" | "suspend" | "retry";
-  restartable?: boolean;
+  on_load?: string;
+  on_unload?: string;
+  on_error: "terminate" | "log" | "ignore";
 }
 
 export interface AgentRuntime {
   requires: string;
-  engine: "openai-compatible" | "anthropic" | "ollama";
+  engine: "anthropic" | "openclaw" | "ollama";
   model?: string;
-  adapter?: string;
+  max_tokens?: number;
 }
 
-export interface AgentIo {
-  input: Record<string, unknown>;   // JSON Schema fragment
-  output: Record<string, unknown>;  // JSON Schema fragment
+export interface ToolBinding {
+  name: string;
+  server: string;
+  description?: string;
 }
-
-/** Well-known capability IDs defined by the Purfle registry. */
-export const WellKnownCapabilities = {
-  Inference:     "inference",
-  WebSearch:     "web-search",
-  Filesystem:    "filesystem",
-  McpTools:      "mcp-tools",
-  CodeExecution: "code-execution",
-  TextToSpeech:  "text-to-speech",
-  SpeechToText:  "speech-to-text",
-} as const;

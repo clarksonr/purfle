@@ -68,6 +68,7 @@ export function signManifest(manifest: AgentManifest, privateKeyPem: string, key
  */
 export function verifyManifest(manifest: AgentManifest, publicKeyPem: string): boolean {
   const jws = manifest.identity.signature;
+  if (!jws) return false;
   const parts = jws.split(".");
   if (parts.length !== 3) return false;
 

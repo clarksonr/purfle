@@ -27,8 +27,7 @@ function makeManifest(overrides?: Partial<AgentManifest>): AgentManifest {
     capabilities: [],
     permissions: {},
     lifecycle: { on_error: "terminate" },
-    runtime: { requires: "purfle/0.1", engine: "openai-compatible" },
-    io: { input: {}, output: {} },
+    runtime: { requires: "purfle/0.1", engine: "anthropic" },
     ...overrides,
   };
 }
@@ -79,7 +78,7 @@ describe("signManifest / verifyManifest", () => {
     const m = makeManifest();
     const signed = signManifest(m, pair.privateKeyPem, pair.keyId);
 
-    assert.ok(signed.identity.signature.length > 0);
+    assert.ok((signed.identity.signature ?? "").length > 0);
     assert.equal(signed.identity.key_id, "round-trip-key");
     assert.ok(verifyManifest(signed, pair.publicKeyPem));
   });
@@ -114,7 +113,7 @@ describe("signManifest / verifyManifest", () => {
   it("JWS header contains alg and kid", () => {
     const pair = generateSigningKey("header-key");
     const signed = signManifest(makeManifest(), pair.privateKeyPem, pair.keyId);
-    const headerB64 = signed.identity.signature.split(".")[0];
+    const headerB64 = signed.identity.signature!.split(".")[0];
     const header = JSON.parse(
       Buffer.from(headerB64.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8")
     );

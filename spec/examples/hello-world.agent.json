@@ -3,43 +3,19 @@
   "id": "11111111-1111-4111-a111-111111111111",
   "name": "Hello World",
   "version": "0.1.0",
-  "description": "Minimal agent for local demonstration. No required capabilities beyond implicit inference.",
+  "description": "Minimal agent for local demonstration.",
   "identity": {
     "author": "clarksonr",
     "email": "roman@example.com",
     "key_id": "hello-key-001",
     "algorithm": "ES256",
     "issued_at": "2026-03-27T00:00:00Z",
-    "expires_at": "2027-03-27T00:00:00Z",
-    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImhlbGxvLWtleS0wMDEifQ.PLACEHOLDER.PLACEHOLDER"
+    "expires_at": "2027-03-27T00:00:00Z"
   },
-  "capabilities": [],
-  "permissions": {
-    "environment": {
-      "allow": ["ANTHROPIC_API_KEY"]
-    }
-  },
-  "lifecycle": {
-    "on_error": "terminate"
-  },
+  "capabilities": ["llm.chat"],
   "runtime": {
     "requires": "purfle/0.1",
-    "engine": "anthropic"
-  },
-  "io": {
-    "input": {
-      "type": "object",
-      "properties": {
-        "message": { "type": "string" }
-      },
-      "required": ["message"]
-    },
-    "output": {
-      "type": "object",
-      "properties": {
-        "response": { "type": "string" }
-      },
-      "required": ["response"]
-    }
+    "engine": "anthropic",
+    "model": "claude-sonnet-4-20250514"
   }
 }

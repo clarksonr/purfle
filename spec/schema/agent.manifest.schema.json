@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://purfle.dev/schema/0.1/agent.manifest.schema.json",
   "title": "Purfle Agent Manifest",
-  "description": "Defines the identity, capabilities, permissions, and lifecycle of a Purfle agent.",
+  "description": "Defines the identity, capabilities, permissions, and runtime configuration of a Purfle agent package.",
   "type": "object",
-  "required": ["purfle", "id", "name", "version", "description", "identity", "capabilities", "permissions", "lifecycle", "runtime", "io"],
+  "required": ["purfle", "id", "name", "version", "identity", "capabilities", "runtime"],
   "additionalProperties": false,
   "properties": {
     "purfle": {
@@ -14,17 +14,19 @@
     },
     "id": {
       "type": "string",
-      "description": "UUID v4. Globally unique manifest identifier."
+      "description": "UUID v4 — globally unique agent identifier.",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
     },
     "name": {
       "type": "string",
       "description": "Human-readable agent name.",
-      "minLength": 1
+      "minLength": 1,
+      "maxLength": 128
     },
     "version": {
       "type": "string",
       "description": "Semantic version of this agent.",
-      "pattern": "^\\d+\\.\\d+\\.\\d+"
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
     },
     "description": {
       "type": "string",
@@ -32,170 +34,293 @@
       "maxLength": 1024
     },
     "identity": {
-      "$ref": "agent.identity.schema.json"
+      "$ref": "#/$defs/identityBlock"
     },
     "capabilities": {
       "type": "array",
-      "description": "Runtime service requirements.",
-      "items": {
-        "$ref": "#/$defs/capability"
-      }
+      "description": "Runtime capabilities this agent requires. Each string must be a phase-1 capability identifier.",
+      "items": { "$ref": "#/$defs/capabilityString" },
+      "minItems": 0,
+      "uniqueItems": true
     },
     "permissions": {
-      "$ref": "#/$defs/permissions"
+      "$ref": "#/$defs/permissionsMap"
     },
     "lifecycle": {
-      "$ref": "#/$defs/lifecycle"
+      "$ref": "#/$defs/lifecycleBlock"
     },
     "runtime": {
-      "$ref": "#/$defs/runtime"
+      "$ref": "#/$defs/runtimeBlock"
+    },
+    "tools": {
+      "type": "array",
+      "description": "MCP tool bindings the AIVM wires at load time.",
+      "items": { "$ref": "#/$defs/toolBinding" }
     },
     "io": {
-      "$ref": "#/$defs/io"
+      "type": "object",
+      "description": "Optional input/output schema hints. No enforcement in phase 1."
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": { "permissions": { "type": "object", "required": ["llm.chat"] } }
+      },
+      "then": {
+        "properties": { "capabilities": { "type": "array", "contains": { "const": "llm.chat" } } }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": { "permissions": { "type": "object", "required": ["llm.completion"] } }
+      },
+      "then": {
+        "properties": { "capabilities": { "type": "array", "contains": { "const": "llm.completion" } } }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": { "permissions": { "type": "object", "required": ["network.outbound"] } }
+      },
+      "then": {
+        "properties": { "capabilities": { "type": "array", "contains": { "const": "network.outbound" } } }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": { "permissions": { "type": "object", "required": ["env.read"] } }
+      },
+      "then": {
+        "properties": { "capabilities": { "type": "array", "contains": { "const": "env.read" } } }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": { "permissions": { "type": "object", "required": ["fs.read"] } }
+      },
+      "then": {
+        "properties": { "capabilities": { "type": "array", "contains": { "const": "fs.read" } } }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": { "permissions": { "type": "object", "required": ["fs.write"] } }
+      },
+      "then": {
+        "properties": { "capabilities": { "type": "array", "contains": { "const": "fs.write" } } }
+      }
+    },
+    {
+      "if": {
+        "required": ["permissions"],
+        "properties": { "permissions": { "type": "object", "required": ["mcp.tool"] } }
+      },
+      "then": {
+        "properties": { "capabilities": { "type": "array", "contains": { "const": "mcp.tool" } } }
+      }
+    }
+  ],
   "$defs": {
-    "capability": {
+    "capabilityString": {
+      "type": "string",
+      "description": "Phase-1 capability identifiers.",
+      "enum": [
+        "llm.chat",
+        "llm.completion",
+        "network.outbound",
+        "env.read",
+        "fs.read",
+        "fs.write",
+        "mcp.tool"
+      ]
+    },
+    "identityBlock": {
       "type": "object",
-      "required": ["id"],
+      "description": "Cryptographic identity block. signature is omitted at authoring time and added by the SDK on publish.",
+      "required": ["author", "email", "key_id", "algorithm", "issued_at", "expires_at"],
       "additionalProperties": false,
       "properties": {
-        "id": {
+        "author": {
           "type": "string",
-          "description": "Capability identifier.",
-          "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$"
+          "description": "Reverse-domain publisher identifier or username.",
+          "minLength": 1,
+          "maxLength": 256
         },
-        "description": {
+        "email": {
           "type": "string",
-          "description": "Why the agent needs this capability."
+          "description": "Contact email of the author.",
+          "format": "email"
         },
-        "required": {
-          "type": "boolean",
-          "description": "If true, load fails when capability is absent.",
-          "default": false
+        "key_id": {
+          "type": "string",
+          "description": "Identifier of the signing key registered in the Purfle key registry.",
+          "minLength": 1
+        },
+        "algorithm": {
+          "const": "ES256",
+          "description": "JWA algorithm. ES256 is the only supported value in v0.1."
+        },
+        "issued_at": {
+          "type": "string",
+          "description": "ISO 8601 timestamp when the manifest was signed.",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "description": "ISO 8601 timestamp after which the manifest is invalid.",
+          "format": "date-time"
+        },
+        "signature": {
+          "type": "string",
+          "description": "JWS Compact Serialization of the signed canonical manifest body. Omit at authoring time.",
+          "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]*\\.[A-Za-z0-9_-]+$"
         }
       }
     },
-    "permissions": {
+    "runtimeBlock": {
       "type": "object",
-      "description": "Resource access grants defining the agent sandbox.",
-      "additionalProperties": false,
-      "properties": {
-        "network": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "allow": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "deny": {
-              "type": "array",
-              "items": { "type": "string" }
-            }
-          }
-        },
-        "filesystem": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "read": {
-              "type": "array",
-              "items": { "type": "string" }
-            },
-            "write": {
-              "type": "array",
-              "items": { "type": "string" }
-            }
-          }
-        },
-        "environment": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "allow": {
-              "type": "array",
-              "items": { "type": "string" }
-            }
-          }
-        },
-        "tools": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "mcp": {
-              "type": "array",
-              "items": { "type": "string" }
-            }
-          }
-        }
-      }
-    },
-    "lifecycle": {
-      "type": "object",
-      "required": ["on_error"],
-      "additionalProperties": false,
-      "properties": {
-        "init_timeout_ms": {
-          "type": "integer",
-          "description": "Max milliseconds from load to ready.",
-          "minimum": 0
-        },
-        "max_runtime_ms": {
-          "type": "integer",
-          "description": "Max milliseconds per invocation. 0 = no limit.",
-          "minimum": 0
-        },
-        "on_error": {
-          "type": "string",
-          "description": "AIVM behavior on agent error.",
-          "enum": ["terminate", "suspend", "retry"]
-        },
-        "restartable": {
-          "type": "boolean",
-          "description": "Whether the AIVM may restart the agent on clean exit.",
-          "default": false
-        }
-      }
-    },
-    "runtime": {
-      "type": "object",
+      "description": "Inference engine and model configuration.",
       "required": ["requires", "engine"],
       "additionalProperties": false,
       "properties": {
         "requires": {
           "type": "string",
-          "description": "Minimum Purfle spec version.",
+          "description": "Minimum Purfle runtime version required.",
           "pattern": "^purfle/\\d+\\.\\d+$"
         },
         "engine": {
           "type": "string",
-          "description": "Inference engine interface.",
-          "enum": ["openai-compatible", "anthropic", "ollama"]
+          "description": "Inference adapter to use.",
+          "enum": ["anthropic", "openclaw", "ollama"]
         },
         "model": {
           "type": "string",
-          "description": "Model identifier passed to the engine."
+          "description": "Model identifier passed to the engine adapter."
         },
-        "adapter": {
-          "type": "string",
-          "description": "Runtime adapter hint."
+        "max_tokens": {
+          "type": "integer",
+          "description": "Maximum tokens the model may generate per turn.",
+          "minimum": 1
         }
       }
     },
-    "io": {
+    "lifecycleBlock": {
       "type": "object",
-      "required": ["input", "output"],
+      "description": "AIVM lifecycle hooks and error policy.",
+      "required": ["on_error"],
       "additionalProperties": false,
       "properties": {
-        "input": {
-          "type": "object",
-          "description": "JSON Schema fragment for agent input."
+        "on_load": {
+          "type": "string",
+          "description": ".NET assembly-qualified type name invoked after the agent is loaded."
         },
-        "output": {
-          "type": "object",
-          "description": "JSON Schema fragment for agent output."
+        "on_unload": {
+          "type": "string",
+          "description": ".NET assembly-qualified type name invoked before the agent is unloaded."
+        },
+        "on_error": {
+          "type": "string",
+          "description": "AIVM behavior when the agent throws an unhandled error.",
+          "enum": ["terminate", "log", "ignore"]
         }
+      }
+    },
+    "toolBinding": {
+      "type": "object",
+      "description": "A single MCP tool binding wired by the AIVM at load time.",
+      "required": ["name", "server"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tool name as exposed to the LLM.",
+          "minLength": 1
+        },
+        "server": {
+          "type": "string",
+          "description": "MCP server URL the AIVM connects to for this tool."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description forwarded to the LLM tool schema."
+        }
+      }
+    },
+    "permissionConfig": {
+      "description": "Configuration block for a single capability's permission grant.",
+      "oneOf": [
+        { "$ref": "#/$defs/networkOutboundConfig" },
+        { "$ref": "#/$defs/envReadConfig" },
+        { "$ref": "#/$defs/fsConfig" },
+        { "$ref": "#/$defs/emptyPermConfig" }
+      ]
+    },
+    "networkOutboundConfig": {
+      "type": "object",
+      "description": "Permission config for network.outbound — lists allowed hostnames.",
+      "required": ["hosts"],
+      "additionalProperties": false,
+      "properties": {
+        "hosts": {
+          "type": "array",
+          "description": "Hostnames the agent may connect to.",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+    "envReadConfig": {
+      "type": "object",
+      "description": "Permission config for env.read — lists readable environment variable names.",
+      "required": ["vars"],
+      "additionalProperties": false,
+      "properties": {
+        "vars": {
+          "type": "array",
+          "description": "Environment variable names the agent may read.",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+    "fsConfig": {
+      "type": "object",
+      "description": "Permission config for fs.read or fs.write — lists allowed paths.",
+      "required": ["paths"],
+      "additionalProperties": false,
+      "properties": {
+        "paths": {
+          "type": "array",
+          "description": "Filesystem paths the agent may access.",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+    "emptyPermConfig": {
+      "type": "object",
+      "description": "Permission config for capabilities that require no configuration (llm.chat, llm.completion, mcp.tool).",
+      "additionalProperties": false
+    },
+    "permissionsMap": {
+      "type": "object",
+      "description": "Permission grants keyed by capability string. Every key must appear in capabilities[].",
+      "additionalProperties": false,
+      "properties": {
+        "llm.chat":        { "$ref": "#/$defs/emptyPermConfig" },
+        "llm.completion":  { "$ref": "#/$defs/emptyPermConfig" },
+        "network.outbound":{ "$ref": "#/$defs/networkOutboundConfig" },
+        "env.read":        { "$ref": "#/$defs/envReadConfig" },
+        "fs.read":         { "$ref": "#/$defs/fsConfig" },
+        "fs.write":        { "$ref": "#/$defs/fsConfig" },
+        "mcp.tool":        { "$ref": "#/$defs/emptyPermConfig" }
       }
     }
   }

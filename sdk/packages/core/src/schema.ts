@@ -13,79 +13,84 @@ let _validate: ReturnType<Ajv["compile"]> | null = null;
 function getValidator(): ReturnType<Ajv["compile"]> {
   if (_validate) return _validate;
 
-  // Inline the identity schema so @purfle/core stays file-system-independent.
+  // Inline identity schema so @purfle/core stays file-system-independent.
   const identitySchema = {
     $id: "agent.identity.schema.json",
     type: "object",
-    required: ["author", "email", "key_id", "algorithm", "issued_at", "expires_at", "signature"],
+    required: ["author", "email", "key_id", "algorithm", "issued_at", "expires_at"],
     additionalProperties: false,
     properties: {
       author:     { type: "string", minLength: 1, maxLength: 256 },
       email:      { type: "string", format: "email" },
       key_id:     { type: "string", minLength: 1 },
-      algorithm:  { type: "string", enum: ["ES256"] },
+      algorithm:  { const: "ES256" },
       issued_at:  { type: "string", format: "date-time" },
       expires_at: { type: "string", format: "date-time" },
+      // signature is optional — omitted at authoring time
       signature:  { type: "string" },
     },
   };
 
+  // Shared permission config shapes
+  const networkOutboundConfig = {
+    type: "object", required: ["hosts"], additionalProperties: false,
+    properties: { hosts: { type: "array", items: { type: "string" }, minItems: 1 } },
+  };
+  const envReadConfig = {
+    type: "object", required: ["vars"], additionalProperties: false,
+    properties: { vars: { type: "array", items: { type: "string" }, minItems: 1 } },
+  };
+  const fsConfig = {
+    type: "object", required: ["paths"], additionalProperties: false,
+    properties: { paths: { type: "array", items: { type: "string" }, minItems: 1 } },
+  };
+  const emptyPermConfig = { type: "object", additionalProperties: false };
+
+  // Cross-field: each permissions key must appear in capabilities[]
+  const capabilityPermChecks = (
+    ["llm.chat", "llm.completion", "network.outbound", "env.read", "fs.read", "fs.write", "mcp.tool"] as const
+  ).map((cap) => ({
+    if: {
+      required: ["permissions"],
+      properties: { permissions: { type: "object", required: [cap] } },
+    },
+    then: {
+      properties: { capabilities: { type: "array", contains: { const: cap } } },
+    },
+  }));
+
   const manifestSchema = {
     $id: "agent.manifest.schema.json",
     type: "object",
-    required: ["purfle", "id", "name", "version", "description", "identity",
-               "capabilities", "permissions", "lifecycle", "runtime", "io"],
+    required: ["purfle", "id", "name", "version", "identity", "capabilities", "runtime"],
     additionalProperties: false,
     properties: {
-      purfle:       { type: "string", pattern: "^\\d+\\.\\d+$" },
-      id:           { type: "string" },
-      name:         { type: "string", minLength: 1 },
-      version:      { type: "string", pattern: "^\\d+\\.\\d+\\.\\d+" },
-      description:  { type: "string", maxLength: 1024 },
-      identity:     { $ref: "agent.identity.schema.json" },
+      purfle:   { type: "string", pattern: "^\\d+\\.\\d+$" },
+      id:       { type: "string", pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" },
+      name:     { type: "string", minLength: 1, maxLength: 128 },
+      version:  { type: "string", pattern: "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$" },
+      description: { type: "string", maxLength: 1024 },
+      identity: { $ref: "agent.identity.schema.json" },
       capabilities: {
         type: "array",
         items: {
-          type: "object",
-          required: ["id"],
-          additionalProperties: false,
-          properties: {
-            id:          { type: "string", pattern: "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$" },
-            description: { type: "string" },
-            required:    { type: "boolean" },
-          },
+          type: "string",
+          enum: ["llm.chat", "llm.completion", "network.outbound", "env.read", "fs.read", "fs.write", "mcp.tool"],
         },
+        minItems: 0,
+        uniqueItems: true,
       },
       permissions: {
         type: "object",
         additionalProperties: false,
         properties: {
-          network: {
-            type: "object", additionalProperties: false,
-            properties: {
-              allow: { type: "array", items: { type: "string" } },
-              deny:  { type: "array", items: { type: "string" } },
-            },
-          },
-          filesystem: {
-            type: "object", additionalProperties: false,
-            properties: {
-              read:  { type: "array", items: { type: "string" } },
-              write: { type: "array", items: { type: "string" } },
-            },
-          },
-          environment: {
-            type: "object", additionalProperties: false,
-            properties: {
-              allow: { type: "array", items: { type: "string" } },
-            },
-          },
-          tools: {
-            type: "object", additionalProperties: false,
-            properties: {
-              mcp: { type: "array", items: { type: "string" } },
-            },
-          },
+          "llm.chat":         emptyPermConfig,
+          "llm.completion":   emptyPermConfig,
+          "network.outbound": networkOutboundConfig,
+          "env.read":         envReadConfig,
+          "fs.read":          fsConfig,
+          "fs.write":         fsConfig,
+          "mcp.tool":         emptyPermConfig,
         },
       },
       lifecycle: {
@@ -93,10 +98,9 @@ function getValidator(): ReturnType<Ajv["compile"]> {
         required: ["on_error"],
         additionalProperties: false,
         properties: {
-          init_timeout_ms: { type: "integer", minimum: 0 },
-          max_runtime_ms:  { type: "integer", minimum: 0 },
-          on_error:        { type: "string", enum: ["terminate", "suspend", "retry"] },
-          restartable:     { type: "boolean" },
+          on_load:   { type: "string" },
+          on_unload: { type: "string" },
+          on_error:  { type: "string", enum: ["terminate", "log", "ignore"] },
         },
       },
       runtime: {
@@ -104,22 +108,28 @@ function getValidator(): ReturnType<Ajv["compile"]> {
         required: ["requires", "engine"],
         additionalProperties: false,
         properties: {
-          requires: { type: "string", pattern: "^purfle/\\d+\\.\\d+$" },
-          engine:   { type: "string", enum: ["openai-compatible", "anthropic", "ollama"] },
-          model:    { type: "string" },
-          adapter:  { type: "string" },
+          requires:   { type: "string", pattern: "^purfle/\\d+\\.\\d+$" },
+          engine:     { type: "string", enum: ["anthropic", "openclaw", "ollama"] },
+          model:      { type: "string" },
+          max_tokens: { type: "integer", minimum: 1 },
         },
       },
-      io: {
-        type: "object",
-        required: ["input", "output"],
-        additionalProperties: false,
-        properties: {
-          input:  { type: "object" },
-          output: { type: "object" },
+      tools: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["name", "server"],
+          additionalProperties: false,
+          properties: {
+            name:        { type: "string", minLength: 1 },
+            server:      { type: "string" },
+            description: { type: "string" },
+          },
         },
       },
+      io: { type: "object" },
     },
+    allOf: capabilityPermChecks,
   };
 
   const ajv = new Ajv({ allErrors: true });

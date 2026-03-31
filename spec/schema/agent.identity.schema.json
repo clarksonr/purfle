@@ -2,14 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://purfle.dev/schema/0.1/agent.identity.schema.json",
   "title": "Purfle Agent Identity",
-  "description": "Cryptographic identity block embedded in an agent manifest.",
+  "description": "Cryptographic identity block embedded in an agent manifest. Used standalone by signing tooling. The signature field is absent at authoring time and populated by the SDK on publish.",
   "type": "object",
-  "required": ["author", "email", "key_id", "algorithm", "issued_at", "expires_at", "signature"],
+  "required": ["author", "email", "key_id", "algorithm", "issued_at", "expires_at"],
   "additionalProperties": false,
   "properties": {
     "author": {
       "type": "string",
-      "description": "Display name of the agent's author or publishing organization.",
+      "description": "Reverse-domain publisher identifier or username.",
       "minLength": 1,
       "maxLength": 256
     },
@@ -24,9 +24,8 @@
       "minLength": 1
     },
     "algorithm": {
-      "type": "string",
-      "description": "JWA algorithm identifier. ES256 is the only supported value in v0.1.",
-      "enum": ["ES256"]
+      "const": "ES256",
+      "description": "JWA algorithm identifier. ES256 is the only supported value in v0.1."
     },
     "issued_at": {
       "type": "string",
@@ -40,7 +39,7 @@
     },
     "signature": {
       "type": "string",
-      "description": "JWS Compact Serialization of the canonical manifest body. The payload is the canonical JSON of the manifest with this field omitted.",
+      "description": "JWS Compact Serialization of the canonical manifest body. The payload is the canonical JSON of the manifest with this field omitted. Absent at authoring time.",
       "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]*\\.[A-Za-z0-9_-]+$"
     }
   }
