@@ -1,4 +1,3 @@
-using Purfle.Runtime.Manifest;
 using Purfle.Runtime.Sandbox;
 
 namespace Purfle.Runtime.Tests.Sandbox;
@@ -8,13 +7,11 @@ public sealed class CapabilityNegotiatorTests
     private static readonly IReadOnlySet<string> s_fullRuntime = new HashSet<string>
     {
         CapabilityNegotiator.WellKnown.Inference,
-        CapabilityNegotiator.WellKnown.WebSearch,
-        CapabilityNegotiator.WellKnown.Filesystem,
-        CapabilityNegotiator.WellKnown.McpTools,
+        CapabilityNegotiator.WellKnown.NetworkOutbound,
+        CapabilityNegotiator.WellKnown.FsRead,
+        CapabilityNegotiator.WellKnown.FsWrite,
+        CapabilityNegotiator.WellKnown.McpTool,
     };
-
-    private static AgentCapability Cap(string id, bool required) =>
-        new() { Id = id, Required = required };
 
     [Fact]
     public void Negotiate_EmptyCapabilities_Succeeds()
@@ -29,8 +26,9 @@ public sealed class CapabilityNegotiatorTests
     [Fact]
     public void Negotiate_RequiredCapabilityPresent_Succeeds()
     {
-        var caps = new[] { Cap(CapabilityNegotiator.WellKnown.WebSearch, required: true) };
-        var result = CapabilityNegotiator.Negotiate(caps, s_fullRuntime);
+        var result = CapabilityNegotiator.Negotiate(
+            [CapabilityNegotiator.WellKnown.NetworkOutbound],
+            s_fullRuntime);
 
         Assert.True(result.Success);
         Assert.Empty(result.MissingRequired);
@@ -39,65 +37,64 @@ public sealed class CapabilityNegotiatorTests
     [Fact]
     public void Negotiate_RequiredCapabilityAbsent_Fails()
     {
-        var caps = new[] { Cap("code-execution", required: true) };
-        var result = CapabilityNegotiator.Negotiate(caps, s_fullRuntime);
+        // "mcp.tool" is not in the runtime set (only inference/network.outbound/fs.*)
+        var result = CapabilityNegotiator.Negotiate(
+            ["mcp.tool"],
+            new HashSet<string> { CapabilityNegotiator.WellKnown.Inference });
 
         Assert.False(result.Success);
         Assert.Single(result.MissingRequired);
-        Assert.Equal("code-execution", result.MissingRequired[0].Id);
+        Assert.Equal("mcp.tool", result.MissingRequired[0]);
     }
 
     [Fact]
-    public void Negotiate_OptionalCapabilityAbsent_SucceedsWithWarning()
+    public void Negotiate_LlmChat_IsAlwaysSatisfied()
     {
-        var caps = new[] { Cap("text-to-speech", required: false) };
-        var result = CapabilityNegotiator.Negotiate(caps, s_fullRuntime);
+        // "llm.chat" is implicitly satisfied regardless of the runtime set
+        var result = CapabilityNegotiator.Negotiate(
+            ["llm.chat"],
+            new HashSet<string>());
 
         Assert.True(result.Success);
         Assert.Empty(result.MissingRequired);
-        Assert.Single(result.MissingOptional);
-        Assert.Equal("text-to-speech", result.MissingOptional[0].Id);
+    }
+
+    [Fact]
+    public void Negotiate_LlmCompletion_IsAlwaysSatisfied()
+    {
+        var result = CapabilityNegotiator.Negotiate(
+            ["llm.completion"],
+            new HashSet<string>());
+
+        Assert.True(result.Success);
+        Assert.Empty(result.MissingRequired);
     }
 
     [Fact]
     public void Negotiate_InferenceAlwaysSatisfied_EvenWhenNotInRuntimeSet()
     {
-        var caps = new[] { Cap(CapabilityNegotiator.WellKnown.Inference, required: true) };
-        var emptyRuntime = new HashSet<string>();
-
-        var result = CapabilityNegotiator.Negotiate(caps, emptyRuntime);
+        var result = CapabilityNegotiator.Negotiate(
+            [CapabilityNegotiator.WellKnown.Inference],
+            new HashSet<string>());
 
         Assert.True(result.Success);
         Assert.Empty(result.MissingRequired);
     }
 
     [Fact]
-    public void Negotiate_MultipleRequired_OneAbsent_ReportsOnlyAbsent()
+    public void Negotiate_MultipleCapabilities_OneAbsent_ReportsOnlyAbsent()
     {
-        var caps = new[]
-        {
-            Cap(CapabilityNegotiator.WellKnown.WebSearch, required: true),   // present
-            Cap("code-execution", required: true),                             // absent
-        };
-
-        var result = CapabilityNegotiator.Negotiate(caps, s_fullRuntime);
+        var result = CapabilityNegotiator.Negotiate(
+            [CapabilityNegotiator.WellKnown.NetworkOutbound, CapabilityNegotiator.WellKnown.McpTool],
+            new HashSet<string>
+            {
+                CapabilityNegotiator.WellKnown.Inference,
+                CapabilityNegotiator.WellKnown.NetworkOutbound,
+                // mcp.tool NOT advertised
+            });
 
         Assert.False(result.Success);
         Assert.Single(result.MissingRequired);
-        Assert.Equal("code-execution", result.MissingRequired[0].Id);
-    }
-
-    [Fact]
-    public void Negotiate_ThirdPartyNamespacedCapability_TreatedNormally()
-    {
-        var runtimeWithThirdParty = new HashSet<string>(s_fullRuntime)
-        {
-            "com.acme.custom-capability",
-        };
-
-        var caps = new[] { Cap("com.acme.custom-capability", required: true) };
-        var result = CapabilityNegotiator.Negotiate(caps, runtimeWithThirdParty);
-
-        Assert.True(result.Success);
+        Assert.Equal("mcp.tool", result.MissingRequired[0]);
     }
 }

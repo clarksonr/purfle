@@ -5,6 +5,7 @@ using Purfle.Runtime.Lifecycle;
 using Purfle.Runtime.Manifest;
 using Purfle.Runtime.Sandbox;
 using Purfle.Runtime.Tests.Integration.Helpers;
+using Purfle.Sdk;
 
 namespace Purfle.Runtime.Tests.Integration;
 
@@ -27,7 +28,6 @@ public sealed class LoadSequenceTests
     {
         var caps = runtimeCaps ?? new HashSet<string> { CapabilityNegotiator.WellKnown.Inference };
         return new AgentLoader(
-            new ManifestLoader(),
             new IdentityVerifier(_factory.CreateRegistry()),
             caps,
             adapterFactory);
@@ -60,15 +60,10 @@ public sealed class LoadSequenceTests
 
     // ── 3. Step 2 — schema validation ─────────────────────────────────────────
 
-    /// <summary>
-    /// Valid JSON that is missing a required top-level field ("name") must be
-    /// rejected at schema validation before reaching identity verification.
-    /// </summary>
     [Fact]
     public async Task Load_ValidJsonMissingRequiredField_FailsAtSchemaStep()
     {
-        // Build raw JSON without "name" — no signing required because the loader
-        // fails at step 2, before it ever reaches step 3 (signature verification).
+        // JSON is syntactically valid but is missing the required "name" field.
         const string json = """
             {
               "purfle": "0.1",
@@ -85,10 +80,7 @@ public sealed class LoadSequenceTests
                 "signature": "eyJhbGciOiJFUzI1NiJ9.dGVzdA.dGVzdA"
               },
               "capabilities": [],
-              "permissions": {},
-              "lifecycle": { "on_error": "terminate" },
-              "runtime": { "requires": "purfle/0.1", "engine": "openai-compatible" },
-              "io": { "input": { "type": "object" }, "output": { "type": "object" } }
+              "runtime": { "requires": "purfle/0.1", "engine": "anthropic" }
             }
             """;
 
@@ -103,9 +95,7 @@ public sealed class LoadSequenceTests
     [Fact]
     public async Task Load_TamperedManifest_FailsSignatureVerification()
     {
-        // Sign a valid manifest, then mutate the serialized JSON before loading.
-        // The payload in the JWS no longer matches the tampered content.
-        var signed = _factory.BuildSignedJson();
+        var signed   = _factory.BuildSignedJson();
         var tampered = JsonNode.Parse(signed)!.AsObject();
         tampered["name"] = "Tampered!";
 
@@ -132,58 +122,26 @@ public sealed class LoadSequenceTests
     [Fact]
     public async Task Load_MissingRequiredCapability_FailsCapabilityNegotiation()
     {
+        // Declare "mcp.tool" which the test runtime does not support.
         var json = _factory.BuildSignedJson(node =>
         {
-            node["capabilities"] = new JsonArray
-            {
-                new JsonObject { ["id"] = "code-execution", ["required"] = true },
-            };
+            node["capabilities"] = new JsonArray { "mcp.tool" };
         });
 
-        // Runtime advertises only implicit inference — code-execution is absent.
         var result = await CreateLoader(
             runtimeCaps: new HashSet<string> { CapabilityNegotiator.WellKnown.Inference }
         ).LoadAsync(json);
 
         Assert.False(result.Success);
         Assert.Equal(LoadFailureReason.CapabilityMissing, result.FailureReason);
-        Assert.Contains("code-execution", result.FailureMessage, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Load_MissingOptionalCapability_SucceedsWithWarning()
-    {
-        var json = _factory.BuildSignedJson(node =>
-        {
-            node["capabilities"] = new JsonArray
-            {
-                // required omitted → defaults to false in the schema
-                new JsonObject { ["id"] = "text-to-speech" },
-            };
-        });
-
-        var result = await CreateLoader(
-            runtimeCaps: new HashSet<string> { CapabilityNegotiator.WellKnown.Inference }
-        ).LoadAsync(json);
-
-        Assert.True(result.Success);
-        var warning = Assert.Single(result.Warnings);
-        Assert.Contains("text-to-speech", warning, StringComparison.Ordinal);
+        Assert.Contains("mcp.tool", result.FailureMessage, StringComparison.Ordinal);
     }
 
     // ── 6. Step 7 — adapter resolution ───────────────────────────────────────
 
-    /// <summary>
-    /// The JSON schema constrains <c>runtime.engine</c> to a fixed enum, so a
-    /// genuinely unknown engine string is rejected at step 2 before it reaches
-    /// the adapter layer.  The equivalent step-7 failure is an adapter factory
-    /// that does not support the manifest's (valid) declared engine.  This test
-    /// proves that path returns <see cref="LoadFailureReason.EngineNotSupported"/>.
-    /// </summary>
     [Fact]
     public async Task Load_EngineNotSupportedByAdapterFactory_FailsWithEngineNotSupported()
     {
-        // hello-world declares engine: openai-compatible.
         var json   = _factory.BuildSignedJson();
         var result = await CreateLoader(adapterFactory: new AlwaysThrowAdapterFactory()).LoadAsync(json);
 
@@ -193,12 +151,9 @@ public sealed class LoadSequenceTests
 
     // ── Private test stubs ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Simulates a runtime that has no adapter registered for any engine.
-    /// </summary>
     private sealed class AlwaysThrowAdapterFactory : IAdapterFactory
     {
-        public IInferenceAdapter Create(AgentManifest manifest, AgentSandbox sandbox)
+        public IInferenceAdapter Create(AgentManifest manifest, AgentSandbox sandbox, IAgent? agent = null)
             => throw new NotSupportedException(
                 $"No adapter registered for engine '{manifest.Runtime.Engine}'.");
     }

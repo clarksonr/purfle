@@ -5,6 +5,8 @@ using Purfle.Runtime.Adapters;
 using Purfle.Runtime.Manifest;
 using Purfle.Runtime.Mcp;
 using Purfle.Runtime.Sandbox;
+using Purfle.Runtime.Tools;
+using Purfle.Sdk;
 
 namespace Purfle.Runtime.Anthropic;
 
@@ -19,6 +21,7 @@ namespace Purfle.Runtime.Anthropic;
 ///   <item><term>write_file</term><description>offered when <c>permissions.filesystem.write</c> is non-empty</description></item>
 ///   <item><term>http_get</term><description>offered when <c>permissions.network.allow</c> is non-empty</description></item>
 ///   <item><term>MCP tools</term><description>offered when connected MCP servers expose tools that pass <c>sandbox.CanUseMcpTool()</c></description></item>
+///   <item><term>Agent tools</term><description>custom tools contributed by <see cref="IAgent.Tools"/></description></item>
 /// </list>
 /// </para>
 ///
@@ -47,42 +50,49 @@ public sealed class AnthropicAdapter : IInferenceAdapter
     /// <summary>Maximum tool-call iterations before the loop is aborted.</summary>
     private const int MaxIterations = 10;
 
-    private readonly HttpClient  _http;
-    private readonly string      _model;
-    private readonly string      _apiKey;
-    private readonly AgentSandbox _sandbox;
+    private readonly HttpClient          _http;
+    private readonly string              _model;
+    private readonly string              _apiKey;
+    private readonly AgentSandbox        _sandbox;
+    private readonly BuiltInToolExecutor _executor;
 
-    /// <summary>Tools built from the manifest permissions + MCP servers. Empty for agents with no OS access.</summary>
+    /// <summary>Tools built from manifest permissions + MCP servers + agent custom tools.</summary>
     private readonly IReadOnlyList<ToolDefinition> _tools;
 
-    /// <summary>MCP tool name → the client that owns it. Used for routing tool calls.</summary>
+    /// <summary>MCP tool name → the client that owns it.</summary>
     private readonly IReadOnlyDictionary<string, IMcpClient> _mcpToolRoutes;
+
+    /// <summary>Agent custom tool name → the IAgentTool implementation.</summary>
+    private readonly IReadOnlyDictionary<string, IAgentTool> _agentToolRoutes;
 
     /// <inheritdoc/>
     public string EngineId => "anthropic";
+
+    private static readonly HashSet<string> BuiltInToolNames =
+        new(["read_file", "write_file", "http_get", "search_files", "find_files"], StringComparer.Ordinal);
 
     /// <summary>
     /// Creates an Anthropic adapter.
     /// </summary>
     /// <param name="manifest">The loaded agent manifest.</param>
     /// <param name="sandbox">The agent's permission sandbox.</param>
-    /// <param name="http">
-    /// Optional <see cref="HttpClient"/>. If null, a new instance is created.
-    /// In production, inject a shared client from <c>IHttpClientFactory</c>.
-    /// </param>
-    /// <param name="mcpClients">
-    /// Optional list of connected MCP clients. The adapter will discover tools from each,
-    /// filter them through the sandbox, and advertise permitted ones to the model.
+    /// <param name="http">Optional <see cref="HttpClient"/>.</param>
+    /// <param name="mcpClients">Optional connected MCP clients.</param>
+    /// <param name="agent">
+    /// Optional agent entry point. When provided, custom tools from
+    /// <see cref="IAgent.Tools"/> are registered alongside built-in tools.
     /// </param>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the sandbox does not permit reading <c>ANTHROPIC_API_KEY</c>
-    /// or when the environment variable is not set.
+    /// Thrown when the sandbox does not permit reading <c>ANTHROPIC_API_KEY</c>,
+    /// when the environment variable is not set, or when an agent tool name
+    /// collides with a built-in tool name.
     /// </exception>
     public AnthropicAdapter(
         AgentManifest manifest,
         AgentSandbox sandbox,
         HttpClient? http = null,
-        IReadOnlyList<IMcpClient>? mcpClients = null)
+        IReadOnlyList<IMcpClient>? mcpClients = null,
+        IAgent? agent = null)
     {
         if (!sandbox.CanReadEnv(EnvApiKey))
             throw new InvalidOperationException(
@@ -93,27 +103,24 @@ public sealed class AnthropicAdapter : IInferenceAdapter
             throw new InvalidOperationException(
                 $"Environment variable '{EnvApiKey}' is not set.");
 
-        _apiKey  = key;
-        _model   = manifest.Runtime.Model ?? DefaultModel;
-        _http    = http ?? new HttpClient();
-        _sandbox = sandbox;
+        _apiKey   = key;
+        _model    = manifest.Runtime.Model ?? DefaultModel;
+        _http     = http ?? new HttpClient();
+        _sandbox  = sandbox;
+        _executor = new BuiltInToolExecutor(sandbox, _http);
 
-        // Build MCP tool routes and tool definitions.
-        var mcpRoutes = new Dictionary<string, IMcpClient>();
+        // ── MCP tools ────────────────────────────────────────────────────────
+        var mcpRoutes   = new Dictionary<string, IMcpClient>();
         var mcpToolDefs = new List<ToolDefinition>();
 
         if (mcpClients is not null)
         {
             foreach (var client in mcpClients)
             {
-                // ListToolsAsync is called synchronously during construction.
-                // MCP servers should respond quickly to tools/list.
                 var tools = client.ListToolsAsync().GetAwaiter().GetResult();
                 foreach (var tool in tools)
                 {
-                    if (!sandbox.CanUseMcpTool(tool.Name))
-                        continue;
-
+                    if (!sandbox.CanUseMcpTool(tool.Name)) continue;
                     mcpRoutes[tool.Name] = client;
                     mcpToolDefs.Add(BuildMcpToolDefinition(tool));
                 }
@@ -122,15 +129,44 @@ public sealed class AnthropicAdapter : IInferenceAdapter
 
         _mcpToolRoutes = mcpRoutes;
 
-        var builtinTools = BuildTools(manifest.Permissions);
-        _tools = [.. builtinTools, .. mcpToolDefs];
+        // ── Agent custom tools ───────────────────────────────────────────────
+        var agentRoutes   = new Dictionary<string, IAgentTool>(StringComparer.Ordinal);
+        var agentToolDefs = new List<ToolDefinition>();
+
+        if (agent?.Tools is { Count: > 0 } customTools)
+        {
+            foreach (var tool in customTools)
+            {
+                if (BuiltInToolNames.Contains(tool.Name))
+                    throw new InvalidOperationException(
+                        $"Agent tool '{tool.Name}' collides with a built-in tool name. " +
+                        "Choose a different name.");
+
+                if (mcpRoutes.ContainsKey(tool.Name))
+                    throw new InvalidOperationException(
+                        $"Agent tool '{tool.Name}' collides with an MCP tool of the same name.");
+
+                agentRoutes[tool.Name] = tool;
+                agentToolDefs.Add(BuildAgentToolDefinition(tool));
+            }
+        }
+
+        _agentToolRoutes = agentRoutes;
+
+        var builtinTools = BuiltInToolDefinitions.For(sandbox.GetPermissions())
+            .Select(s => new ToolDefinition(
+                Name:        s.Name,
+                Description: s.Description,
+                InputSchema: new InputSchema(
+                    Type:       "object",
+                    Properties: s.Parameters.ToDictionary(p => p.Name, p => new ToolProperty(p.Type, p.Description)),
+                    Required:   [.. s.Required])))
+            .ToList();
+        _tools = [.. builtinTools, .. mcpToolDefs, .. agentToolDefs];
     }
 
     // ── Single-turn interface ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Sends a single-turn inference request. Stateless — no conversation history is retained.
-    /// </summary>
     public async Task<string> InvokeAsync(
         string systemPrompt,
         string userMessage,
@@ -144,13 +180,6 @@ public sealed class AnthropicAdapter : IInferenceAdapter
 
     // ── Multi-turn interface ─────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Sends an inference request with full conversation history. Each element in
-    /// <paramref name="conversationHistory"/> is a message object (role + content).
-    /// The new <paramref name="userMessage"/> is appended automatically.
-    /// Returns the model's text reply and the updated message list (including the
-    /// assistant turn) so the caller can feed it back for subsequent turns.
-    /// </summary>
     public async Task<(string Reply, List<object> UpdatedHistory)> InvokeMultiTurnAsync(
         string systemPrompt,
         List<object> conversationHistory,
@@ -165,11 +194,11 @@ public sealed class AnthropicAdapter : IInferenceAdapter
         if (_tools.Count == 0)
         {
             var request = new MessagesRequest(
-                Model:    _model,
+                Model:     _model,
                 MaxTokens: 4096,
-                System:   systemPrompt,
-                Messages: messages,
-                Tools:    null);
+                System:    systemPrompt,
+                Messages:  messages,
+                Tools:     null);
 
             var response = await PostAsync(request, ct);
             var text = response.Content.First(b => b.Type == "text").Text
@@ -179,15 +208,14 @@ public sealed class AnthropicAdapter : IInferenceAdapter
             return (text, messages);
         }
 
-        // Tool-call loop with history.
         for (int i = 0; i < MaxIterations; i++)
         {
             var request = new MessagesRequest(
-                Model:    _model,
+                Model:     _model,
                 MaxTokens: 4096,
-                System:   systemPrompt,
-                Messages: messages,
-                Tools:    _tools);
+                System:    systemPrompt,
+                Messages:  messages,
+                Tools:     _tools);
 
             var response = await PostAsync(request, ct);
 
@@ -224,17 +252,17 @@ public sealed class AnthropicAdapter : IInferenceAdapter
             $"Tool-call loop exceeded {MaxIterations} iterations without reaching end_turn.");
     }
 
-    // ── Single-turn path (no tools configured) ───────────────────────────────
+    // ── Single-turn path ──────────────────────────────────────────────────────
 
     private async Task<string> InvokeSingleTurnAsync(
         string systemPrompt, string userMessage, CancellationToken ct)
     {
         var request = new MessagesRequest(
-            Model:    _model,
+            Model:     _model,
             MaxTokens: 4096,
-            System:   systemPrompt,
-            Messages: [new TextMessage("user", userMessage)],
-            Tools:    null);
+            System:    systemPrompt,
+            Messages:  [new TextMessage("user", userMessage)],
+            Tools:     null);
 
         var response = await PostAsync(request, ct);
         return response.Content.First(b => b.Type == "text").Text
@@ -254,11 +282,11 @@ public sealed class AnthropicAdapter : IInferenceAdapter
         for (int i = 0; i < MaxIterations; i++)
         {
             var request = new MessagesRequest(
-                Model:    _model,
+                Model:     _model,
                 MaxTokens: 4096,
-                System:   systemPrompt,
-                Messages: messages,
-                Tools:    _tools);
+                System:    systemPrompt,
+                Messages:  messages,
+                Tools:     _tools);
 
             var response = await PostAsync(request, ct);
 
@@ -271,10 +299,8 @@ public sealed class AnthropicAdapter : IInferenceAdapter
 
             if (response.StopReason == "tool_use")
             {
-                // Record the full assistant turn (may contain both text and tool_use blocks).
                 messages.Add(new ContentArrayMessage("assistant", response.Content));
 
-                // Execute each tool call and collect results.
                 var results = new List<ToolResultContent>();
                 foreach (var block in response.Content.Where(b => b.Type == "tool_use"))
                 {
@@ -299,173 +325,46 @@ public sealed class AnthropicAdapter : IInferenceAdapter
     private async Task<string> ExecuteToolAsync(
         string toolName, JsonElement? input, CancellationToken ct)
     {
-        // Check built-in tools first.
-        switch (toolName)
+        // Built-in tools are handled by the shared executor.
+        if (BuiltInToolNames.Contains(toolName))
+            return await _executor.ExecuteAsync(toolName, input, ct);
+
+        // Agent custom tools.
+        if (_agentToolRoutes.TryGetValue(toolName, out var agentTool))
         {
-            case "read_file":
-                return ExecuteReadFile(input?.GetProperty("path").GetString() ?? "");
-            case "write_file":
-                return ExecuteWriteFile(
-                    input?.GetProperty("path").GetString() ?? "",
-                    input?.GetProperty("content").GetString() ?? "");
-            case "http_get":
-                return await ExecuteHttpGetAsync(
-                    input?.GetProperty("url").GetString() ?? "", ct);
+            try   { return await agentTool.ExecuteAsync(input?.GetRawText() ?? "{}", ct); }
+            catch (Exception ex) { return $"Error: agent tool '{toolName}' failed — {ex.Message}"; }
         }
 
-        // Route to MCP client if the tool is registered.
+        // MCP tools.
         if (_mcpToolRoutes.TryGetValue(toolName, out var mcpClient))
         {
             if (!_sandbox.CanUseMcpTool(toolName))
                 return $"Error: permission denied — MCP tool '{toolName}' is not in the agent's tools.mcp allowlist.";
-
-            try
-            {
-                var arguments = input?.GetRawText() ?? "{}";
-                return await mcpClient.CallToolAsync(toolName, arguments, ct);
-            }
-            catch (Exception ex)
-            {
-                return $"Error: MCP tool '{toolName}' failed — {ex.Message}";
-            }
+            try   { return await mcpClient.CallToolAsync(toolName, input?.GetRawText() ?? "{}", ct); }
+            catch (Exception ex) { return $"Error: MCP tool '{toolName}' failed — {ex.Message}"; }
         }
 
         return $"Error: unknown tool '{toolName}'.";
     }
 
-    /// <summary>
-    /// Reads a file from disk. The sandbox is checked before the read; if the path is not
-    /// covered by <c>permissions.filesystem.read</c> the error string is returned to the
-    /// model rather than raising an exception, allowing the model to recover gracefully.
-    /// </summary>
-    private string ExecuteReadFile(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            return "Error: path must not be empty.";
+    // ── MCP / agent tool schema translation ──────────────────────────────────
 
-        if (!_sandbox.CanReadPath(path))
-            return $"Error: permission denied — '{path}' is not in the agent's filesystem.read allowlist.";
-
-        if (!File.Exists(path))
-            return $"Error: file not found — '{path}'.";
-
-        return File.ReadAllText(path);
-    }
-
-    /// <summary>
-    /// Writes content to a file. The sandbox is checked before the write; if the path is
-    /// not covered by <c>permissions.filesystem.write</c> the error string is returned to
-    /// the model rather than raising an exception.
-    /// </summary>
-    private string ExecuteWriteFile(string path, string content)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            return "Error: path must not be empty.";
-
-        if (!_sandbox.CanWritePath(path))
-            return $"Error: permission denied — '{path}' is not in the agent's filesystem.write allowlist.";
-
-        var dir = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(dir))
-            Directory.CreateDirectory(dir);
-
-        File.WriteAllText(path, content);
-        return "OK";
-    }
-
-    /// <summary>
-    /// Fetches a URL via HTTP GET. The sandbox is checked before the request; if the URL
-    /// is not covered by <c>permissions.network.allow</c> (or is explicitly denied) the
-    /// error string is returned to the model rather than raising an exception.
-    /// </summary>
-    private async Task<string> ExecuteHttpGetAsync(string url, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-            return "Error: url must not be empty.";
-
-        if (!_sandbox.CanAccessUrl(url))
-            return $"Error: permission denied — '{url}' is not in the agent's network.allow list.";
-
-        try
-        {
-            return await _http.GetStringAsync(url, ct);
-        }
-        catch (Exception ex)
-        {
-            return $"Error: HTTP GET failed — {ex.Message}";
-        }
-    }
-
-    // ── Tool building ─────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Inspects the agent's permission block and constructs the list of built-in tools to
-    /// advertise to the model. Only tools backed by at least one permission pattern are
-    /// included — a chat agent with no filesystem or network permissions receives an empty
-    /// list and takes the single-turn path instead.
-    /// </summary>
-    private static IReadOnlyList<ToolDefinition> BuildTools(AgentPermissions permissions)
-    {
-        var tools = new List<ToolDefinition>();
-
-        if (permissions.Filesystem?.Read.Count > 0)
-        {
-            tools.Add(new ToolDefinition(
-                Name: "read_file",
-                Description: "Read the full text contents of a file on the local filesystem. " +
-                             "Only paths matching the agent's filesystem.read permission patterns are accessible.",
-                InputSchema: new InputSchema(
-                    Type: "object",
-                    Properties: new Dictionary<string, ToolProperty>
-                    {
-                        ["path"] = new ToolProperty("string", "Absolute path to the file to read."),
-                    },
-                    Required: ["path"])));
-        }
-
-        if (permissions.Filesystem?.Write.Count > 0)
-        {
-            tools.Add(new ToolDefinition(
-                Name: "write_file",
-                Description: "Write text content to a file on the local filesystem. " +
-                             "Only paths matching the agent's filesystem.write permission patterns are accessible.",
-                InputSchema: new InputSchema(
-                    Type: "object",
-                    Properties: new Dictionary<string, ToolProperty>
-                    {
-                        ["path"]    = new ToolProperty("string", "Absolute path to the file to write."),
-                        ["content"] = new ToolProperty("string", "Text content to write to the file."),
-                    },
-                    Required: ["path", "content"])));
-        }
-
-        if (permissions.Network?.Allow.Count > 0)
-        {
-            tools.Add(new ToolDefinition(
-                Name: "http_get",
-                Description: "Fetch a URL via HTTP GET and return the response body as text. " +
-                             "Only URLs matching the agent's network.allow patterns are accessible.",
-                InputSchema: new InputSchema(
-                    Type: "object",
-                    Properties: new Dictionary<string, ToolProperty>
-                    {
-                        ["url"] = new ToolProperty("string", "The URL to fetch."),
-                    },
-                    Required: ["url"])));
-        }
-
-        return tools;
-    }
-
-    /// <summary>
-    /// Converts an <see cref="McpToolInfo"/> into an Anthropic tool definition.
-    /// The MCP tool's input schema JSON is parsed and decomposed into the Anthropic format.
-    /// </summary>
     private static ToolDefinition BuildMcpToolDefinition(McpToolInfo tool)
     {
         var schemaDoc = JsonDocument.Parse(tool.InputSchemaJson);
-        var root = schemaDoc.RootElement;
+        return ParseSchemaToToolDefinition(tool.Name, tool.Description, schemaDoc.RootElement);
+    }
 
+    private static ToolDefinition BuildAgentToolDefinition(IAgentTool tool)
+    {
+        var schemaDoc = JsonDocument.Parse(tool.InputSchemaJson);
+        return ParseSchemaToToolDefinition(tool.Name, tool.Description, schemaDoc.RootElement);
+    }
+
+    private static ToolDefinition ParseSchemaToToolDefinition(
+        string name, string description, JsonElement root)
+    {
         var properties = new Dictionary<string, ToolProperty>();
         if (root.TryGetProperty("properties", out var props))
         {
@@ -479,13 +378,11 @@ public sealed class AnthropicAdapter : IInferenceAdapter
 
         var required = Array.Empty<string>();
         if (root.TryGetProperty("required", out var req))
-        {
             required = req.EnumerateArray().Select(e => e.GetString()!).ToArray();
-        }
 
         return new ToolDefinition(
-            Name: tool.Name,
-            Description: tool.Description,
+            Name: name,
+            Description: description,
             InputSchema: new InputSchema(
                 Type: "object",
                 Properties: properties,
@@ -516,8 +413,8 @@ public sealed class AnthropicAdapter : IInferenceAdapter
 
     private static readonly JsonSerializerOptions s_serializerOptions = new()
     {
-        PropertyNamingPolicy          = JsonNamingPolicy.SnakeCaseLower,
-        DefaultIgnoreCondition        = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy   = JsonNamingPolicy.SnakeCaseLower,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
     // ── Request / response shapes ─────────────────────────────────────────────
@@ -529,16 +426,10 @@ public sealed class AnthropicAdapter : IInferenceAdapter
         IEnumerable<object> Messages,
         IReadOnlyList<ToolDefinition>? Tools);
 
-    /// <summary>Regular text message (initial user turn, or any assistant turn without tools).</summary>
     private sealed record TextMessage(string Role, string Content);
 
-    /// <summary>
-    /// Assistant message whose content is an array of blocks (text + tool_use mix).
-    /// Sent back verbatim so the model retains its own reasoning.
-    /// </summary>
     private sealed record ContentArrayMessage(string Role, ContentBlock[] Content);
 
-    /// <summary>User turn carrying tool results back to the model.</summary>
     private sealed record ToolResultMessage(string Role, ToolResultContent[] Content);
 
     private sealed record ContentBlock(

@@ -39,6 +39,10 @@ public sealed class IdentityVerifier(IKeyRegistry keyRegistry)
             return VerificationResult.Fail(LoadFailureReason.SignatureInvalid,
                 $"Unsupported algorithm '{identity.Algorithm}'. Only ES256 is supported in v0.1.");
 
+        if (identity.Signature is null)
+            return VerificationResult.Fail(LoadFailureReason.SignatureInvalid,
+                "Manifest has no signature. Sign the manifest with the SDK before deploying.");
+
         var signatureValid = VerifyEs256(key, rawManifestJson, identity.Signature);
         if (!signatureValid)
             return VerificationResult.Fail(LoadFailureReason.SignatureInvalid,
@@ -67,14 +71,12 @@ public sealed class IdentityVerifier(IKeyRegistry keyRegistry)
         var payloadB64 = parts[1];
         var signatureBytes = Base64UrlDecode(parts[2]);
 
-        // The payload segment must match the base64url of the canonical manifest body.
         var canonicalBytes = CanonicalJson.ForSigning(rawManifestJson);
         var expectedPayloadB64 = Base64UrlEncode(canonicalBytes);
 
         if (!string.Equals(payloadB64, expectedPayloadB64, StringComparison.Ordinal))
             return false;
 
-        // Signing input: ASCII bytes of "header.payload"
         var signingInput = Encoding.ASCII.GetBytes($"{headerB64}.{payloadB64}");
 
         var ecParams = new ECParameters
@@ -85,7 +87,6 @@ public sealed class IdentityVerifier(IKeyRegistry keyRegistry)
 
         using var ecdsa = ECDsa.Create(ecParams);
 
-        // JWS uses IEEE P1363 format (raw R||S), not DER.
         return ecdsa.VerifyData(
             signingInput,
             signatureBytes,

@@ -10,25 +10,29 @@ namespace Purfle.Runtime.Tests.Integration;
 /// Proves that an agent's runtime sandbox enforces exactly the permissions
 /// declared in its manifest — nothing more, nothing less.
 ///
-/// Each test loads a signed manifest through the complete <see cref="AgentLoader"/>
-/// pipeline, extracts the resulting <see cref="AgentSandbox"/>, and verifies that
-/// attempts to exceed the declared scope are blocked.  The deny-by-default
-/// principle (spec §3.3) is also covered explicitly.
+/// Uses the canonical permission format: "network.outbound", "env.read",
+/// "fs.read", "fs.write", "mcp.tool" as permission keys.
 /// </summary>
 public sealed class SandboxEnforcementTests
 {
     private readonly ManifestTestFactory _factory = new();
 
-    /// <summary>
-    /// Runs the full load sequence and returns the sandbox on success.
-    /// Fails the test immediately if loading fails for any reason.
-    /// </summary>
+    // All well-known capabilities — negotiation must pass so we can test sandbox enforcement.
+    private static readonly IReadOnlySet<string> s_allCaps = new HashSet<string>
+    {
+        CapabilityNegotiator.WellKnown.Inference,
+        CapabilityNegotiator.WellKnown.NetworkOutbound,
+        CapabilityNegotiator.WellKnown.EnvRead,
+        CapabilityNegotiator.WellKnown.FsRead,
+        CapabilityNegotiator.WellKnown.FsWrite,
+        CapabilityNegotiator.WellKnown.McpTool,
+    };
+
     private async Task<AgentSandbox> LoadSandboxAsync(string manifestJson)
     {
         var loader = new AgentLoader(
-            new ManifestLoader(),
             new IdentityVerifier(_factory.CreateRegistry()),
-            new HashSet<string> { CapabilityNegotiator.WellKnown.Inference });
+            s_allCaps);
 
         var result = await loader.LoadAsync(manifestJson);
         Assert.True(result.Success, $"Load failed unexpectedly: {result.FailureMessage}");
@@ -37,10 +41,6 @@ public sealed class SandboxEnforcementTests
 
     // ── Deny by default ───────────────────────────────────────────────────────
 
-    /// <summary>
-    /// hello-world declares <c>permissions: {}</c>.  Every resource class must
-    /// be denied because no allowlist is present (spec §3.3 — deny by default).
-    /// </summary>
     [Fact]
     public async Task EmptyPermissions_DeniesAllResourceClasses()
     {
@@ -56,10 +56,9 @@ public sealed class SandboxEnforcementTests
     // ── Network ───────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Network_CallToAllowedUrl_IsPermitted()
+    public async Task Network_CallToAllowedHost_IsPermitted()
     {
-        var json = _factory.BuildSignedJson(WithNetwork(
-            allow: ["https://api.example.com/*"]));
+        var json = _factory.BuildSignedJson(WithNetworkOutbound(["api.example.com"]));
 
         var sandbox = await LoadSandboxAsync(json);
 
@@ -67,27 +66,13 @@ public sealed class SandboxEnforcementTests
     }
 
     [Fact]
-    public async Task Network_CallToUrlNotInAllowList_IsBlocked()
+    public async Task Network_CallToHostNotInAllowList_IsBlocked()
     {
-        var json = _factory.BuildSignedJson(WithNetwork(
-            allow: ["https://api.example.com/*"]));
+        var json = _factory.BuildSignedJson(WithNetworkOutbound(["api.example.com"]));
 
         var sandbox = await LoadSandboxAsync(json);
 
         Assert.False(sandbox.CanAccessUrl("https://evil.example.com/exfil"));
-    }
-
-    [Fact]
-    public async Task Network_CallToExplicitlyDeniedUrl_IsBlockedEvenIfAlsoAllowed()
-    {
-        var json = _factory.BuildSignedJson(WithNetwork(
-            allow: ["https://api.example.com/*"],
-            deny:  ["https://api.example.com/admin/*"]));
-
-        var sandbox = await LoadSandboxAsync(json);
-
-        Assert.True(sandbox.CanAccessUrl("https://api.example.com/v1/search"));
-        Assert.False(sandbox.CanAccessUrl("https://api.example.com/admin/users"));
     }
 
     // ── Filesystem read ───────────────────────────────────────────────────────
@@ -95,8 +80,7 @@ public sealed class SandboxEnforcementTests
     [Fact]
     public async Task Filesystem_ReadWithinDeclaredPath_IsPermitted()
     {
-        var json = _factory.BuildSignedJson(WithFilesystem(
-            read: ["/data/**"]));
+        var json = _factory.BuildSignedJson(WithFsRead(["/data/**"]));
 
         var sandbox = await LoadSandboxAsync(json);
 
@@ -106,8 +90,7 @@ public sealed class SandboxEnforcementTests
     [Fact]
     public async Task Filesystem_ReadOutsideDeclaredPath_IsBlocked()
     {
-        var json = _factory.BuildSignedJson(WithFilesystem(
-            read: ["/data/**"]));
+        var json = _factory.BuildSignedJson(WithFsRead(["/data/**"]));
 
         var sandbox = await LoadSandboxAsync(json);
 
@@ -119,8 +102,7 @@ public sealed class SandboxEnforcementTests
     [Fact]
     public async Task Filesystem_WriteWithinDeclaredPath_IsPermitted()
     {
-        var json = _factory.BuildSignedJson(WithFilesystem(
-            write: ["/tmp/**"]));
+        var json = _factory.BuildSignedJson(WithFsWrite(["/tmp/**"]));
 
         var sandbox = await LoadSandboxAsync(json);
 
@@ -130,8 +112,7 @@ public sealed class SandboxEnforcementTests
     [Fact]
     public async Task Filesystem_WriteOutsideDeclaredPath_IsBlocked()
     {
-        var json = _factory.BuildSignedJson(WithFilesystem(
-            write: ["/tmp/**"]));
+        var json = _factory.BuildSignedJson(WithFsWrite(["/tmp/**"]));
 
         var sandbox = await LoadSandboxAsync(json);
 
@@ -141,8 +122,7 @@ public sealed class SandboxEnforcementTests
     [Fact]
     public async Task Filesystem_ReadGrantDoesNotConferWriteAccess()
     {
-        var json = _factory.BuildSignedJson(WithFilesystem(
-            read: ["/data/**"]));
+        var json = _factory.BuildSignedJson(WithFsRead(["/data/**"]));
 
         var sandbox = await LoadSandboxAsync(json);
 
@@ -155,7 +135,7 @@ public sealed class SandboxEnforcementTests
     [Fact]
     public async Task Environment_DeclaredVariable_IsPermitted()
     {
-        var json = _factory.BuildSignedJson(WithEnvironment(["MODEL_API_ENDPOINT"]));
+        var json = _factory.BuildSignedJson(WithEnvRead(["MODEL_API_ENDPOINT"]));
 
         var sandbox = await LoadSandboxAsync(json);
 
@@ -165,7 +145,7 @@ public sealed class SandboxEnforcementTests
     [Fact]
     public async Task Environment_UndeclaredVariable_IsBlocked()
     {
-        var json = _factory.BuildSignedJson(WithEnvironment(["MODEL_API_ENDPOINT"]));
+        var json = _factory.BuildSignedJson(WithEnvRead(["MODEL_API_ENDPOINT"]));
 
         var sandbox = await LoadSandboxAsync(json);
 
@@ -175,78 +155,95 @@ public sealed class SandboxEnforcementTests
     // ── MCP tools ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task McpTools_DeclaredTool_IsPermitted()
+    public async Task McpTools_WhenMcpToolPermissionGranted_AllToolsArePermitted()
     {
-        var json = _factory.BuildSignedJson(WithMcpTools(["filesystem"]));
+        // Canonical mcp.tool permission has no tool list — all MCP tools are allowed
+        var json = _factory.BuildSignedJson(WithMcpTool());
 
         var sandbox = await LoadSandboxAsync(json);
 
         Assert.True(sandbox.CanUseMcpTool("filesystem"));
+        Assert.True(sandbox.CanUseMcpTool("web-search"));
     }
 
     [Fact]
-    public async Task McpTools_UndeclaredTool_IsBlocked()
+    public async Task McpTools_WhenNoMcpPermission_AllToolsAreBlocked()
     {
-        var json = _factory.BuildSignedJson(WithMcpTools(["filesystem"]));
+        var sandbox = await LoadSandboxAsync(_factory.BuildSignedJson());
 
-        var sandbox = await LoadSandboxAsync(json);
-
-        Assert.False(sandbox.CanUseMcpTool("web-search"));
+        Assert.False(sandbox.CanUseMcpTool("filesystem"));
     }
 
     // ── Mutation helpers ──────────────────────────────────────────────────────
 
-    private static Action<JsonObject> WithNetwork(
-        string[]? allow = null,
-        string[]? deny  = null)
+    private static Action<JsonObject> WithNetworkOutbound(string[] hosts)
         => node =>
         {
-            var network = new JsonObject();
-            if (allow is not null)
-                network["allow"] = ToJsonArray(allow);
-            if (deny is not null)
-                network["deny"] = ToJsonArray(deny);
-
-            node["permissions"] = new JsonObject { ["network"] = network };
+            var arr = new JsonArray();
+            foreach (var h in hosts) arr.Add(h);
+            node["permissions"] = new JsonObject
+            {
+                ["network.outbound"] = new JsonObject { ["hosts"] = arr },
+            };
+            AddCapabilityIfMissing(node, "network.outbound");
         };
 
-    private static Action<JsonObject> WithFilesystem(
-        string[]? read  = null,
-        string[]? write = null)
+    private static Action<JsonObject> WithFsRead(string[] paths)
         => node =>
         {
-            var fs = new JsonObject();
-            if (read is not null)
-                fs["read"] = ToJsonArray(read);
-            if (write is not null)
-                fs["write"] = ToJsonArray(write);
-
-            node["permissions"] = new JsonObject { ["filesystem"] = fs };
+            var arr = new JsonArray();
+            foreach (var p in paths) arr.Add(p);
+            node["permissions"] = new JsonObject
+            {
+                ["fs.read"] = new JsonObject { ["paths"] = arr },
+            };
+            AddCapabilityIfMissing(node, "fs.read");
         };
 
-    private static Action<JsonObject> WithEnvironment(string[] allow)
+    private static Action<JsonObject> WithFsWrite(string[] paths)
+        => node =>
+        {
+            var arr = new JsonArray();
+            foreach (var p in paths) arr.Add(p);
+            node["permissions"] = new JsonObject
+            {
+                ["fs.write"] = new JsonObject { ["paths"] = arr },
+            };
+            AddCapabilityIfMissing(node, "fs.write");
+        };
+
+    private static Action<JsonObject> WithEnvRead(string[] vars)
+        => node =>
+        {
+            var arr = new JsonArray();
+            foreach (var v in vars) arr.Add(v);
+            node["permissions"] = new JsonObject
+            {
+                ["env.read"] = new JsonObject { ["vars"] = arr },
+            };
+            AddCapabilityIfMissing(node, "env.read");
+        };
+
+    private static Action<JsonObject> WithMcpTool()
         => node =>
         {
             node["permissions"] = new JsonObject
             {
-                ["environment"] = new JsonObject { ["allow"] = ToJsonArray(allow) },
+                ["mcp.tool"] = new JsonObject(),
             };
+            AddCapabilityIfMissing(node, "mcp.tool");
         };
 
-    private static Action<JsonObject> WithMcpTools(string[] mcp)
-        => node =>
-        {
-            node["permissions"] = new JsonObject
-            {
-                ["tools"] = new JsonObject { ["mcp"] = ToJsonArray(mcp) },
-            };
-        };
-
-    private static JsonArray ToJsonArray(string[] values)
+    /// <summary>
+    /// Ensures the manifest's capabilities array contains <paramref name="cap"/>.
+    /// Required because the canonical schema enforces that every permissions key
+    /// also appears in capabilities[].
+    /// </summary>
+    private static void AddCapabilityIfMissing(JsonObject node, string cap)
     {
-        var arr = new JsonArray();
-        foreach (var v in values)
-            arr.Add(v);
-        return arr;
+        var caps = node["capabilities"]?.AsArray() ?? new JsonArray();
+        if (!caps.Any(c => c?.GetValue<string>() == cap))
+            caps.Add(cap);
+        node["capabilities"] = caps;
     }
 }

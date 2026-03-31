@@ -1,62 +1,64 @@
-using Purfle.Runtime.Manifest;
-
 namespace Purfle.Runtime.Sandbox;
 
 /// <summary>
 /// Implements load sequence step 4: capability negotiation.
 ///
-/// The agent declares what it requires; the runtime declares what it offers.
-/// Any required capability absent from the runtime's set is a load failure.
-/// Missing optional capabilities produce warnings only.
+/// The agent declares what it needs; the runtime declares what it supports.
+/// All declared capabilities are treated as required — the canonical manifest
+/// schema has no "optional" capability concept.
+///
+/// "llm.chat" and "llm.completion" are implicitly satisfied by any AIVM
+/// because inference is the runtime's core function.
 /// </summary>
 public static class CapabilityNegotiator
 {
     /// <summary>
-    /// Well-known capability IDs reserved by the Purfle registry.
-    /// Runtimes may support any subset of these plus third-party namespaced IDs.
+    /// Well-known capability identifiers used by the Purfle runtime.
     /// </summary>
     public static class WellKnown
     {
         /// <summary>
-        /// Always implicitly required. Declaring it in the manifest has no effect.
-        /// Listed here so runtimes can include it in their advertised set.
+        /// Legacy internal inference identifier. Always implicitly satisfied.
+        /// Prefer <see cref="LlmChat"/> and <see cref="LlmCompletion"/> in new code.
         /// </summary>
         public const string Inference = "inference";
 
-        public const string WebSearch       = "web-search";
-        public const string Filesystem      = "filesystem";
-        public const string McpTools        = "mcp-tools";
-        public const string CodeExecution   = "code-execution";
-        public const string TextToSpeech    = "text-to-speech";
-        public const string SpeechToText    = "speech-to-text";
+        public const string LlmChat       = "llm.chat";
+        public const string LlmCompletion = "llm.completion";
+        public const string NetworkOutbound = "network.outbound";
+        public const string EnvRead        = "env.read";
+        public const string FsRead         = "fs.read";
+        public const string FsWrite        = "fs.write";
+        public const string McpTool        = "mcp.tool";
     }
+
+    /// <summary>
+    /// Capability IDs that are always implicitly available on any AIVM.
+    /// Declaring these in the manifest is harmless but never causes a failure.
+    /// </summary>
+    private static readonly HashSet<string> s_alwaysSatisfied =
+        new(["inference", "llm.chat", "llm.completion"], StringComparer.Ordinal);
 
     /// <summary>
     /// Compares <paramref name="agentCapabilities"/> against
     /// <paramref name="runtimeCapabilitySet"/> and returns a negotiation result.
+    /// All declared capabilities are required in the canonical manifest model.
     /// </summary>
     public static NegotiationResult Negotiate(
-        IReadOnlyList<AgentCapability> agentCapabilities,
+        IReadOnlyList<string> agentCapabilities,
         IReadOnlySet<string> runtimeCapabilitySet)
     {
-        var missingRequired = new List<AgentCapability>();
-        var missingOptional = new List<AgentCapability>();
+        var missing = new List<string>();
 
         foreach (var cap in agentCapabilities)
         {
-            // "inference" is always implicitly satisfied; skip it.
-            if (cap.Id.Equals(WellKnown.Inference, StringComparison.Ordinal))
+            if (s_alwaysSatisfied.Contains(cap))
                 continue;
 
-            if (!runtimeCapabilitySet.Contains(cap.Id))
-            {
-                if (cap.Required)
-                    missingRequired.Add(cap);
-                else
-                    missingOptional.Add(cap);
-            }
+            if (!runtimeCapabilitySet.Contains(cap))
+                missing.Add(cap);
         }
 
-        return new NegotiationResult(missingRequired, missingOptional);
+        return new NegotiationResult(missing, []);
     }
 }

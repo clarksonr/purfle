@@ -213,12 +213,19 @@ purfle/
 - `spec/schema/agent.identity.schema.json` — identity block schema
 - `spec/rfcs/0001-identity-model.md` — JWS/ES256 identity RFC (accepted)
 - `spec/SPEC.md` — human-readable manifest specification v0.1
+- **`AgentManifest.cs`** — canonical C# record hierarchy (`IdentityBlock`, `RuntimeBlock`, `LifecycleBlock`, `ToolBinding`) aligned with spec
+- **`ManifestLoader.cs`** — file-path loader (`Load(path)`) + `internal static ParseJson(json)` used by `AgentLoader`
+- **`AgentLoader.cs`** — full 7-step load sequence (parse → schema → identity → caps → sandbox → assembly → adapter)
+- **`EmbeddedSchemas.cs`** — updated to canonical schema format (string capabilities, capability-string permission keys)
+- **`CapabilityNegotiator.cs`** — operates on `List<string>` capabilities; all are required; `inference/llm.*` always satisfied
+- **`AgentSandbox.cs`** — canonical `Dictionary<string, JsonElement>?` constructor; `GetPermissions()` exposed for adapters
+- **65 passing tests** across Manifest, Identity, Sandbox, and Integration suites (4 live AI tests skip without API keys)
 
 ### What does NOT exist yet (priority order)
-1. `runtime/.../Manifest/ManifestLoader.cs` — loads + deserializes manifest
-2. `runtime/.../Manifest/ManifestValidator.cs` — semantic validation
-3. Integration tests in `Purfle.Runtime.Tests`
-4. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`
+1. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`
+2. Agent assembly (`agent.dll`) loading end-to-end — `AssemblyLoadContext` wiring exists but untested with a real DLL
+3. Windows Credential Manager integration for API key storage
+4. Marketplace phase
 
 ---
 
