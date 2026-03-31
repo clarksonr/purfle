@@ -27,7 +27,7 @@ export function buildCommand(dir: string): void {
     console.log(`✓  ${manifest.name} v${manifest.version}`);
     console.log(`   id:          ${manifest.id}`);
     console.log(`   engine:      ${manifest.runtime.engine}`);
-    console.log(`   on_error:    ${manifest.lifecycle.on_error}`);
+    console.log(`   on_error:    ${manifest.lifecycle?.on_error}`);
     console.log(`   capabilities: ${manifest.capabilities.length} declared`);
 
     const missingIdentity = !manifest.identity.signature || manifest.identity.key_id === "unsigned";

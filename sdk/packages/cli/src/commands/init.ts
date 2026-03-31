@@ -35,7 +35,7 @@ export function initCommand(name: string, options: { dir?: string }): void {
     },
     runtime: {
       requires: "purfle/0.1",
-      engine: "openai-compatible",
+      engine: "anthropic",
     },
     io: {
       input: { type: "object", properties: {}, required: [] },
