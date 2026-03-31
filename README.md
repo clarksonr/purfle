@@ -1,5 +1,5 @@
 # Purfle
-
+<img src="purfle-icon.svg" width="120" align="right" />
 Purfle is an AI Virtual Machine (AIVM) — a desktop runtime that loads AI agents the way a JVM loads bytecode: verify identity first, enforce capability boundaries always, execute only what was declared.
 
 Each agent is defined by a **signed manifest** that declares its identity, runtime requirements, capability needs, and permission scope. The AIVM enforces all of it before a single line of agent code runs. An agent cannot exceed the scope it declared. It cannot load on a runtime that cannot satisfy its requirements.
