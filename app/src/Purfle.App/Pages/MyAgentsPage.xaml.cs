@@ -1,38 +1,32 @@
-using Purfle.App.Services;
+using Purfle.App.ViewModels;
 
 namespace Purfle.App.Pages;
 
 public partial class MyAgentsPage : ContentPage
 {
-    private readonly AgentStore _store;
-
-    public MyAgentsPage(AgentStore store)
+    public MyAgentsPage(MainViewModel viewModel)
     {
         InitializeComponent();
-        _store = store;
+        BindingContext = viewModel;
     }
 
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        RefreshList();
-    }
-
-    private void RefreshList()
-    {
-        AgentsList.ItemsSource = _store.ListInstalled();
-    }
-
-    private async void OnRemove(object? sender, EventArgs e)
-    {
-        if (sender is Button button && button.CommandParameter is string agentId)
+        if (BindingContext is MainViewModel vm)
         {
-            var confirm = await DisplayAlertAsync("Remove Agent",
-                $"Remove locally installed agent '{agentId}'?", "Remove", "Cancel");
-            if (!confirm) return;
+            foreach (var card in vm.Agents)
+                card.StartPolling(Dispatcher);
+        }
+    }
 
-            _store.Uninstall(agentId);
-            RefreshList();
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        if (BindingContext is MainViewModel vm)
+        {
+            foreach (var card in vm.Agents)
+                card.StopPolling();
         }
     }
 }

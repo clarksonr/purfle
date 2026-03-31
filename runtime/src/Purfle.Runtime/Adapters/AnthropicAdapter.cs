@@ -25,32 +25,38 @@ public sealed class AnthropicAdapter : ILlmAdapter
     private const int    DefaultMaxTokens = 1024;
 
     private readonly HttpClient _http;
-    private readonly string     _apiKey;
     private readonly string     _model;
     private readonly int        _maxTokens;
+    // Key is read lazily at call time so the adapter can be constructed before the
+    // environment variable is available (e.g. before the app injects it from SecureStorage).
 
-    /// <param name="manifest">The agent manifest supplying runtime parameters.</param>
-    /// <param name="http">Optional <see cref="HttpClient"/> override (e.g. for tests).</param>
-    /// <exception cref="LlmAdapterException">
-    /// Thrown when <c>ANTHROPIC_API_KEY</c> is not set in the environment.
-    /// </exception>
+    /// <summary>Creates an adapter using default model and max_tokens.</summary>
+    public AnthropicAdapter(HttpClient? http = null)
+    {
+        _model     = DefaultModel;
+        _maxTokens = DefaultMaxTokens;
+        _http      = http ?? new HttpClient();
+    }
+
+    /// <summary>Creates an adapter whose model/max_tokens come from the manifest.</summary>
     public AnthropicAdapter(AgentManifest manifest, HttpClient? http = null)
     {
-        var key = Environment.GetEnvironmentVariable(EnvApiKey);
-        if (string.IsNullOrWhiteSpace(key))
-            throw new LlmAdapterException(
-                $"Environment variable '{EnvApiKey}' is not set.");
-
-        _apiKey    = key;
         _model     = manifest.Runtime.Model     ?? DefaultModel;
         _maxTokens = manifest.Runtime.MaxTokens ?? DefaultMaxTokens;
         _http      = http ?? new HttpClient();
     }
 
     /// <inheritdoc/>
+    /// <exception cref="LlmAdapterException">
+    /// Thrown when <c>ANTHROPIC_API_KEY</c> is not set or when the API returns an error.
+    /// </exception>
     public async Task<string> CompleteAsync(
         string systemPrompt, string userMessage, CancellationToken ct = default)
     {
+        var apiKey = Environment.GetEnvironmentVariable(EnvApiKey);
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new LlmAdapterException($"Environment variable '{EnvApiKey}' is not set.");
+
         var body = new MessagesRequest(
             Model:     _model,
             MaxTokens: _maxTokens,
@@ -58,7 +64,7 @@ public sealed class AnthropicAdapter : ILlmAdapter
             Messages:  [new TextMessage("user", userMessage)]);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, ApiEndpoint);
-        request.Headers.Add("x-api-key", _apiKey);
+        request.Headers.Add("x-api-key", apiKey);
         request.Headers.Add("anthropic-version", ApiVersion);
         request.Content = JsonContent.Create(body, options: s_jsonOptions);
 
