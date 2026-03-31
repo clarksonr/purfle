@@ -36,7 +36,7 @@
             </CollectionView.ItemTemplate>
 
             <CollectionView.EmptyView>
-                <Label Text="Search the Purfle Marketplace for agents."
+                <Label Text="No agents found in the marketplace."
                        HorizontalOptions="Center"
                        VerticalOptions="Center"
                        TextColor="Gray" />

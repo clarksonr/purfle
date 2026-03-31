@@ -46,6 +46,9 @@
     "permissions": {
       "$ref": "#/$defs/permissionsMap"
     },
+    "schedule": {
+      "$ref": "#/$defs/scheduleBlock"
+    },
     "lifecycle": {
       "$ref": "#/$defs/lifecycleBlock"
     },
@@ -140,6 +143,35 @@
         "fs.write",
         "mcp.tool"
       ]
+    },
+    "scheduleBlock": {
+      "type": "object",
+      "description": "Defines when and how often the AIVM triggers this agent.",
+      "required": ["trigger"],
+      "additionalProperties": false,
+      "properties": {
+        "trigger": {
+          "type": "string",
+          "description": "Trigger type: interval (every N minutes), cron (cron expression), startup (once on AIVM start).",
+          "enum": ["interval", "cron", "startup"]
+        },
+        "interval_minutes": {
+          "type": "integer",
+          "description": "Required when trigger is 'interval'. How often to run in minutes.",
+          "minimum": 1
+        },
+        "cron": {
+          "type": "string",
+          "description": "Required when trigger is 'cron'. Standard 5-field cron expression.",
+          "minLength": 1
+        }
+      },
+      "if": { "properties": { "trigger": { "const": "interval" } } },
+      "then": { "required": ["interval_minutes"] },
+      "else": {
+        "if": { "properties": { "trigger": { "const": "cron" } } },
+        "then": { "required": ["cron"] }
+      }
     },
     "identityBlock": {
       "type": "object",

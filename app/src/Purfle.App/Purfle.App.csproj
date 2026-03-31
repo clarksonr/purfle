@@ -64,6 +64,8 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\..\..\marketplace\src\Purfle.Marketplace.Shared\Purfle.Marketplace.Shared.csproj" />
 	  <ProjectReference Include="..\..\..\runtime\src\Purfle.Runtime\Purfle.Runtime.csproj" />
+	  <ProjectReference Include="..\..\..\runtime\src\Purfle.Runtime.Anthropic\Purfle.Runtime.Anthropic.csproj" />
+	  <ProjectReference Include="..\..\..\runtime\src\Purfle.Runtime.Gemini\Purfle.Runtime.Gemini.csproj" />
 	</ItemGroup>
 
 </Project>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Purfle.App.Pages.AgentRunPage"
+             Title="Run Agent">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <!-- Messages / status area -->
+        <Grid Grid.Row="0">
+
+            <!-- Chat message list (visible once loaded) -->
+            <ScrollView x:Name="MessagesScroll" IsVisible="False">
+                <VerticalStackLayout x:Name="MessagesList"
+                                     Padding="12,8"
+                                     Spacing="8" />
+            </ScrollView>
+
+            <!-- Loading / error overlay (visible while loading) -->
+            <VerticalStackLayout x:Name="StatusView"
+                                 HorizontalOptions="Center"
+                                 VerticalOptions="Center"
+                                 Spacing="12">
+                <ActivityIndicator x:Name="LoadingIndicator"
+                                   IsRunning="True"
+                                   HorizontalOptions="Center" />
+                <Label x:Name="StatusLabel"
+                       Text="Loading agent…"
+                       HorizontalOptions="Center"
+                       TextColor="Gray"
+                       FontSize="14" />
+            </VerticalStackLayout>
+
+        </Grid>
+
+        <!-- Input row -->
+        <Grid Grid.Row="1"
+              ColumnDefinitions="*,Auto"
+              Padding="8"
+              ColumnSpacing="8"
+              BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Black}}">
+            <Entry x:Name="MessageEntry"
+                   Placeholder="Ask something…"
+                   IsEnabled="False"
+                   ReturnType="Send"
+                   Completed="OnSend" />
+            <Button x:Name="SendButton"
+                    Text="Send"
+                    Grid.Column="1"
+                    IsEnabled="False"
+                    Clicked="OnSend" />
+        </Grid>
+
+    </Grid>
+
+</ContentPage>

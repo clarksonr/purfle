@@ -7,6 +7,8 @@ obj/
 
 # Local secrets — never commit
 **/Properties/launchSettings.json
+.signing/
+dist/
 
 # Node
 node_modules/
@@ -14,3 +16,6 @@ sdk/packages/*/dist/
 
 # Marketplace runtime data (OpenIddict state, JSON storage)
 marketplace/src/Purfle.Marketplace.Api/data/
+
+# Debug / scratch temp directories
+*TEMP/

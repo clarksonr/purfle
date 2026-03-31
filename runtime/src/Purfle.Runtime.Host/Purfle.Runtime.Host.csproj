@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Purfle.Runtime\Purfle.Runtime.csproj" />
     <ProjectReference Include="..\Purfle.Runtime.Anthropic\Purfle.Runtime.Anthropic.csproj" />
+    <ProjectReference Include="..\Purfle.Runtime.Gemini\Purfle.Runtime.Gemini.csproj" />
     <ProjectReference Include="..\Purfle.Runtime.OpenClaw\Purfle.Runtime.OpenClaw.csproj" />
     <ProjectReference Include="..\Purfle.Runtime.Ollama\Purfle.Runtime.Ollama.csproj" />
   </ItemGroup>

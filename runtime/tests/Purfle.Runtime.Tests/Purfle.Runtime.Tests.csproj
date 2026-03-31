@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Purfle.Runtime\Purfle.Runtime.csproj" />
+    <ProjectReference Include="..\..\src\Purfle.Runtime.Anthropic\Purfle.Runtime.Anthropic.csproj" />
+    <ProjectReference Include="..\..\src\Purfle.Runtime.Gemini\Purfle.Runtime.Gemini.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -27,6 +30,15 @@
     <None Include="..\..\..\spec\examples\hello-world.agent.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>hello-world.agent.json</Link>
+    </None>
+    <!-- Sample agent manifests for live AI invocation tests -->
+    <None Include="..\..\..\agents\chat.agent.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>chat.agent.json</Link>
+    </None>
+    <None Include="..\..\..\agents\file-search.agent.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>file-search.agent.json</Link>
     </None>
   </ItemGroup>
 

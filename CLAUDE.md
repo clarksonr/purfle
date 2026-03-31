@@ -233,11 +233,13 @@ purfle/
 │   │   └── Purfle.Runtime.Tests/
 │   └── Purfle.Runtime.sln
 ├── app/                         ← .NET MAUI desktop app
-│   ├── Purfle.App/
-│   │   ├── MainPage.xaml
-│   │   ├── AgentCardView.xaml
-│   │   └── ViewModels/
-│   └── Purfle.App.sln
+│   └── src/
+│       ├── src.sln
+│       └── Purfle.App/
+│           ├── Pages/           ← SearchPage, MyAgentsPage, SettingsPage, AgentRunPage, LogViewPage
+│           ├── Controls/        ← AgentCard.xaml
+│           ├── ViewModels/      ← MainViewModel, AgentCardViewModel
+│           └── Services/        ← AgentStore, MarketplaceService, AgentExecutorService, AppAdapterFactory
 ├── sdk/
 │   ├── packages/
 │   │   ├── cli/src/commands/
@@ -274,13 +276,26 @@ purfle/
 - **`AnthropicAdapter`** — implements `IInferenceAdapter` + `ILlmAdapter`; `CompleteAsync` delegates to `InvokeAsync`
 - **`AgentRunner`** — `Purfle.Runtime.Lifecycle`; loads `prompts/system.md` or uses default; calls `ILlmAdapter.CompleteAsync`; appends timestamped entry to `OutputPath/run.log`
 - **`Scheduler`** — `Purfle.Runtime.Anthropic`; creates `AnthropicAdapter` by default; drives `AgentRunner` on `Timer` using `schedule.interval_minutes`
-- **73 passing tests** (8 new `AgentRunnerTests`); 4 live AI tests skip without API keys
+- **82 passing tests** (4 live AI tests skip without API keys)
+- **`.NET MAUI desktop app`** — `app/src/Purfle.App`; builds for Windows (`net10.0-windows10.0.19041.0`) and Mac
+  - Three tabs: Search (marketplace browser), My Agents (scheduled agent cards), Settings
+  - `AgentCard` control — name, status indicator (Idle/Running/Error/Stopped), last/next run, View Log button
+  - `AgentCardViewModel` — wraps `AgentRunner`, polls status every 5 s, raises `INotifyPropertyChanged`
+  - `MainViewModel` — `ObservableCollection<AgentCardViewModel>`, `AddAgentCommand` (FilePicker → `aivm/agents/`)
+  - `MauiProgram` — creates `Scheduler`, scans `%LOCALAPPDATA%/aivm/agents`, validates with `ManifestLoader`, registers and starts
+  - `LogViewPage` — scrollable `run.log` viewer with Refresh button
+  - `AgentRunPage` — interactive chat UI backed by `ConversationSession`
+  - `SettingsPage` — marketplace URL, engine picker, API key storage (SecureStorage), OAuth PKCE login
+  - `AgentStore` — local install at `~/.purfle/agents/<id>/`; supports raw manifest and `.purfle` ZIP bundle
+  - `AppAdapterFactory` — creates `AnthropicAdapter` or `GeminiAdapter` based on engine preference
+  - `AgentExecutorService` — ephemeral P-256 re-signing for local dev trust model
+- **`spec/examples/email-monitor.agent.json`** — scheduled interval agent, 15 min, Gmail + Anthropic
 
 ### What does NOT exist yet (priority order)
 1. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`
 2. Agent assembly (`agent.dll`) loading end-to-end — `AssemblyLoadContext` wiring exists but untested with a real DLL
-3. Windows Credential Manager integration for API key storage
-4. Marketplace phase
+3. Windows Credential Manager integration for API key storage (currently uses SecureStorage / env vars)
+4. Marketplace backend — `Purfle.Marketplace.Api` scaffolded but not fully wired
 
 ---
 

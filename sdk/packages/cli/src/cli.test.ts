@@ -178,12 +178,12 @@ describe("purfle publish", () => {
     assert.ok(stderr.includes("not signed"));
   });
 
-  it("shows not-yet-implemented for signed manifest", () => {
+  it("rejects signed manifest when not authenticated", () => {
     const agentDir = join(tmp, "pub-test");
     run(["sign", agentDir, "--generate-key"]);
-    const { stdout, code } = run(["publish", agentDir]);
+    const { stderr, code } = run(["publish", agentDir]);
     assert.equal(code, 1);
-    assert.ok(stdout.includes("Not yet implemented"));
+    assert.ok(stderr.includes("Not authenticated"));
   });
 });
 

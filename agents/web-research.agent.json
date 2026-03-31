@@ -1,0 +1,72 @@
+{
+  "purfle": "0.1",
+  "id": "cccccccc-cccc-4ccc-cccc-cccccccccccc",
+  "name": "Purfle Web Research",
+  "version": "1.0.0",
+  "description": "Fetches web pages and synthesises research. Uses http_get for page content and extract_links to discover further URLs. Denies direct access to the Anthropic API.",
+  "identity": {
+    "author": "Roman Noble",
+    "email": "roman@purfle.dev",
+    "key_id": "purfle-samples-key",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-30T00:00:00Z",
+    "expires_at": "2027-03-30T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1zYW1wbGVzLWtleSJ9.eyJjYXBhYmlsaXRpZXMiOlt7ImlkIjoid2ViLXNlYXJjaCIsInJlcXVpcmVkIjpmYWxzZX1dLCJkZXNjcmlwdGlvbiI6IkZldGNoZXMgd2ViIHBhZ2VzIGFuZCBzeW50aGVzaXNlcyByZXNlYXJjaC4gVXNlcyBodHRwX2dldCBmb3IgcGFnZSBjb250ZW50IGFuZCBleHRyYWN0X2xpbmtzIHRvIGRpc2NvdmVyIGZ1cnRoZXIgVVJMcy4gRGVuaWVzIGRpcmVjdCBhY2Nlc3MgdG8gdGhlIEFudGhyb3BpYyBBUEkuIiwiaWQiOiJjY2NjY2NjYy1jY2NjLTRjY2MtY2NjYy1jY2NjY2NjY2NjY2MiLCJpZGVudGl0eSI6eyJhbGdvcml0aG0iOiJFUzI1NiIsImF1dGhvciI6IlJvbWFuIE5vYmxlIiwiZW1haWwiOiJyb21hbkBwdXJmbGUuZGV2IiwiZXhwaXJlc19hdCI6IjIwMjctMDMtMzBUMDA6MDA6MDBaIiwiaXNzdWVkX2F0IjoiMjAyNi0wMy0zMFQwMDowMDowMFoiLCJrZXlfaWQiOiJwdXJmbGUtc2FtcGxlcy1rZXkifSwiaW8iOnsiaW5wdXQiOnsicHJvcGVydGllcyI6eyJtZXNzYWdlIjp7ImRlc2NyaXB0aW9uIjoiVGhlIHJlc2VhcmNoIHF1ZXN0aW9uIG9yIHRvcGljLiIsInR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbIm1lc3NhZ2UiXSwidHlwZSI6Im9iamVjdCJ9LCJvdXRwdXQiOnsicHJvcGVydGllcyI6eyJyZXNwb25zZSI6eyJkZXNjcmlwdGlvbiI6IlJlc2VhcmNoIHN1bW1hcnkgd2l0aCBzb3VyY2UgVVJMcy4iLCJ0eXBlIjoic3RyaW5nIn19LCJyZXF1aXJlZCI6WyJyZXNwb25zZSJdLCJ0eXBlIjoib2JqZWN0In19LCJsaWZlY3ljbGUiOnsib25fZXJyb3IiOiJ0ZXJtaW5hdGUiLCJyZXN0YXJ0YWJsZSI6dHJ1ZX0sIm5hbWUiOiJQdXJmbGUgV2ViIFJlc2VhcmNoIiwicGVybWlzc2lvbnMiOnsiZW52aXJvbm1lbnQiOnsiYWxsb3ciOlsiR0VNSU5JX0FQSV9LRVkiXX0sIm5ldHdvcmsiOnsiYWxsb3ciOlsiaHR0cHM6Ly8qKiJdLCJkZW55IjpbImh0dHBzOi8vYXBpLmFudGhyb3BpYy5jb20vKioiXX19LCJwdXJmbGUiOiIwLjEiLCJydW50aW1lIjp7ImVuZ2luZSI6ImdlbWluaSIsIm1vZGVsIjoiZ2VtaW5pLTIuNS1mbGFzaCIsInJlcXVpcmVzIjoicHVyZmxlLzAuMSJ9LCJ2ZXJzaW9uIjoiMS4wLjAifQ.mPAj-FKeeXflc2RkZ76nWZVnpbc3ii2OdiZtuYa0k2-r2ZyFTwskmjHxAXy77TNd-0XU7dOSIek01CgdXpIn4Q"
+  },
+  "capabilities": [
+    {
+      "id": "web-search",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": {
+      "allow": [
+        "https://**"
+      ],
+      "deny": [
+        "https://api.anthropic.com/**"
+      ]
+    },
+    "environment": {
+      "allow": [
+        "GEMINI_API_KEY"
+      ]
+    }
+  },
+  "lifecycle": {
+    "on_error": "terminate",
+    "restartable": true
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "gemini",
+    "model": "gemini-2.5-flash"
+  },
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "The research question or topic."
+        }
+      },
+      "required": [
+        "message"
+      ]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "response": {
+          "type": "string",
+          "description": "Research summary with source URLs."
+        }
+      },
+      "required": [
+        "response"
+      ]
+    }
+  }
+}

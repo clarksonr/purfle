@@ -13,11 +13,19 @@ public partial class SearchPage : ContentPage
         _marketplace = marketplace;
     }
 
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await LoadAgentsAsync(null);
+    }
+
     private async void OnSearch(object? sender, EventArgs e)
     {
-        var query = SearchBar.Text;
-        if (string.IsNullOrWhiteSpace(query)) return;
+        await LoadAgentsAsync(SearchBar.Text);
+    }
 
+    private async Task LoadAgentsAsync(string? query)
+    {
         try
         {
             var result = await _marketplace.SearchAsync(query);

@@ -1,14 +1,25 @@
 <Solution>
+  <Folder Name="/sdk/dotnet/">
+    <Project Path="sdk/dotnet/Purfle.Sdk/Purfle.Sdk.csproj" />
+  </Folder>
   <Folder Name="/runtime/src/">
     <Project Path="runtime/src/Purfle.Runtime/Purfle.Runtime.csproj" />
+    <Project Path="runtime/src/Purfle.Runtime.Anthropic/Purfle.Runtime.Anthropic.csproj" />
+    <Project Path="runtime/src/Purfle.Runtime.Gemini/Purfle.Runtime.Gemini.csproj" />
     <Project Path="runtime/src/Purfle.Runtime.Host/Purfle.Runtime.Host.csproj" />
     <Project Path="runtime/src/Purfle.Runtime.OpenClaw/Purfle.Runtime.OpenClaw.csproj" />
   </Folder>
   <Folder Name="/runtime/tests/">
     <Project Path="runtime/tests/Purfle.Runtime.Tests/Purfle.Runtime.Tests.csproj" />
   </Folder>
+  <Folder Name="/agents/src/">
+    <Project Path="agents/src/Purfle.Agents.Chat/Purfle.Agents.Chat.csproj" />
+    <Project Path="agents/src/Purfle.Agents.FileSearch/Purfle.Agents.FileSearch.csproj" />
+    <Project Path="agents/src/Purfle.Agents.WebResearch/Purfle.Agents.WebResearch.csproj" />
+  </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/Purfle.Agents.Seeder/Purfle.Agents.Seeder.csproj" />
+    <Project Path="tools/Purfle.Packager/Purfle.Packager.csproj" />
   </Folder>
   <Folder Name="/marketplace/src/">
     <Project Path="marketplace/src/Purfle.Marketplace.Api/Purfle.Marketplace.Api.csproj" />

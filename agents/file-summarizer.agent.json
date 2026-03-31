@@ -7,11 +7,11 @@
   "identity": {
     "author": "Roman Noble",
     "email": "roman@purfle.dev",
-    "key_id": "purfle-samples-key-001",
+    "key_id": "purfle-samples-key",
     "algorithm": "ES256",
     "issued_at": "2026-03-28T00:00:00Z",
     "expires_at": "2027-03-28T00:00:00Z",
-    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1zYW1wbGVzLWtleS0wMDEifQ.PLACEHOLDER.PLACEHOLDER"
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1zYW1wbGVzLWtleSJ9.eyJjYXBhYmlsaXRpZXMiOlt7ImRlc2NyaXB0aW9uIjoiUmVhZHMgZmlsZXMgZnJvbSB0aGUgbG9jYWwgZmlsZXN5c3RlbSB0byBmdWxmaWxsIHN1bW1hcml6YXRpb24gcmVxdWVzdHMuIiwiaWQiOiJmaWxlc3lzdGVtLXJlYWQiLCJyZXF1aXJlZCI6dHJ1ZX1dLCJkZXNjcmlwdGlvbiI6IlJlYWRzIGEgbG9jYWwgdGV4dCBvciBtYXJrZG93biBmaWxlIGFuZCByZXR1cm5zIGEgY29uY2lzZSBzdW1tYXJ5IHdpdGggd29yZCBjb3VudC4gRGVjbGFyZXMgZmlsZXN5c3RlbS5yZWFkIG9uIHVzZXIgZG9jdW1lbnQgcGF0aHMg4oCUIHRoZSBzYW5kYm94IGVuZm9yY2VzIHJlYWQtb25seSBhY2Nlc3MgdG8gdGhvc2UgcGF0aHMgb25seS4iLCJpZCI6ImJiYmJiYmJiLWJiYmItNGJiYi1iYmJiLWJiYmJiYmJiYmJiYiIsImlkZW50aXR5Ijp7ImFsZ29yaXRobSI6IkVTMjU2IiwiYXV0aG9yIjoiUm9tYW4gTm9ibGUiLCJlbWFpbCI6InJvbWFuQHB1cmZsZS5kZXYiLCJleHBpcmVzX2F0IjoiMjAyNy0wMy0yOFQwMDowMDowMFoiLCJpc3N1ZWRfYXQiOiIyMDI2LTAzLTI4VDAwOjAwOjAwWiIsImtleV9pZCI6InB1cmZsZS1zYW1wbGVzLWtleSJ9LCJpbyI6eyJpbnB1dCI6eyJwcm9wZXJ0aWVzIjp7ImZpbGVfcGF0aCI6eyJkZXNjcmlwdGlvbiI6IkFic29sdXRlIHBhdGggdG8gdGhlIGZpbGUgdG8gc3VtbWFyaXplLiIsInR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbImZpbGVfcGF0aCJdLCJ0eXBlIjoib2JqZWN0In0sIm91dHB1dCI6eyJwcm9wZXJ0aWVzIjp7InN1bW1hcnkiOnsiZGVzY3JpcHRpb24iOiJDb25jaXNlIHN1bW1hcnkgb2YgdGhlIGZpbGUgY29udGVudHMuIiwidHlwZSI6InN0cmluZyJ9LCJ3b3JkX2NvdW50Ijp7ImRlc2NyaXB0aW9uIjoiQXBwcm94aW1hdGUgd29yZCBjb3VudCBvZiB0aGUgc291cmNlIGZpbGUuIiwidHlwZSI6ImludGVnZXIifX0sInJlcXVpcmVkIjpbInN1bW1hcnkiLCJ3b3JkX2NvdW50Il0sInR5cGUiOiJvYmplY3QifX0sImxpZmVjeWNsZSI6eyJpbml0X3RpbWVvdXRfbXMiOjUwMDAsIm1heF9ydW50aW1lX21zIjo2MDAwMCwib25fZXJyb3IiOiJ0ZXJtaW5hdGUifSwibmFtZSI6IkZpbGUgU3VtbWFyaXplciIsInBlcm1pc3Npb25zIjp7ImVudmlyb25tZW50Ijp7ImFsbG93IjpbIkdFTUlOSV9BUElfS0VZIl19LCJmaWxlc3lzdGVtIjp7InJlYWQiOlsiQzovVXNlcnMvKiovKi50eHQiLCJDOi9Vc2Vycy8qKi8qLm1kIiwiQzovVXNlcnMvKiovKi5wZGYiXX19LCJwdXJmbGUiOiIwLjEiLCJydW50aW1lIjp7ImVuZ2luZSI6ImdlbWluaSIsIm1vZGVsIjoiZ2VtaW5pLTIuNS1mbGFzaCIsInJlcXVpcmVzIjoicHVyZmxlLzAuMSJ9LCJ2ZXJzaW9uIjoiMS4wLjAifQ.ZdR-p0ceQhi2dJAtiAsefm5jM5t742O86FrNfTY_XCyK5ktv9pA_9f6FgdnRgrqh3Q0kJbBgiCq5z2TPSrOIhA"
   },
   "capabilities": [
     {
@@ -29,7 +29,9 @@
       ]
     },
     "environment": {
-      "allow": ["ANTHROPIC_API_KEY"]
+      "allow": [
+        "GEMINI_API_KEY"
+      ]
     }
   },
   "lifecycle": {
@@ -39,24 +41,38 @@
   },
   "runtime": {
     "requires": "purfle/0.1",
-    "engine": "anthropic",
-    "model": "claude-haiku-4-5-20251001"
+    "engine": "gemini",
+    "model": "gemini-2.5-flash"
   },
   "io": {
     "input": {
       "type": "object",
       "properties": {
-        "file_path": { "type": "string", "description": "Absolute path to the file to summarize." }
+        "file_path": {
+          "type": "string",
+          "description": "Absolute path to the file to summarize."
+        }
       },
-      "required": ["file_path"]
+      "required": [
+        "file_path"
+      ]
     },
     "output": {
       "type": "object",
       "properties": {
-        "summary": { "type": "string", "description": "Concise summary of the file contents." },
-        "word_count": { "type": "integer", "description": "Approximate word count of the source file." }
+        "summary": {
+          "type": "string",
+          "description": "Concise summary of the file contents."
+        },
+        "word_count": {
+          "type": "integer",
+          "description": "Approximate word count of the source file."
+        }
       },
-      "required": ["summary", "word_count"]
+      "required": [
+        "summary",
+        "word_count"
+      ]
     }
   }
 }

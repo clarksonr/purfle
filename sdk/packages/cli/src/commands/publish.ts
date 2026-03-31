@@ -12,13 +12,6 @@ interface PublishOptions {
 export async function publishCommand(dir: string, options: PublishOptions): Promise<void> {
   const registry = getRegistryUrl(options.registry);
 
-  // Check authentication.
-  const creds = loadCredentials();
-  if (!creds) {
-    console.error("Not authenticated. Run `purfle login` first.");
-    process.exit(1);
-  }
-
   const manifestPath = join(dir, "agent.json");
   if (!existsSync(manifestPath)) {
     console.error(`No agent.json found in '${dir}'.`);
@@ -30,6 +23,13 @@ export async function publishCommand(dir: string, options: PublishOptions): Prom
 
   if (!manifest.identity.signature) {
     console.error("Manifest is not signed. Run `purfle sign` first.");
+    process.exit(1);
+  }
+
+  // Check authentication after signature check — no point authenticating an unsigned manifest.
+  const creds = loadCredentials();
+  if (!creds) {
+    console.error("Not authenticated. Run `purfle login` first.");
     process.exit(1);
   }
 

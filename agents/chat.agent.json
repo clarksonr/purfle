@@ -7,16 +7,18 @@
   "identity": {
     "author": "Roman Noble",
     "email": "roman@purfle.dev",
-    "key_id": "purfle-samples-key-001",
+    "key_id": "purfle-samples-key",
     "algorithm": "ES256",
     "issued_at": "2026-03-28T00:00:00Z",
     "expires_at": "2027-03-28T00:00:00Z",
-    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1zYW1wbGVzLWtleS0wMDEifQ.PLACEHOLDER.PLACEHOLDER"
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1zYW1wbGVzLWtleSJ9.eyJjYXBhYmlsaXRpZXMiOltdLCJkZXNjcmlwdGlvbiI6IkEgZ2VuZXJhbC1wdXJwb3NlIGNvbnZlcnNhdGlvbmFsIGFnZW50LiBTZW5kIGEgbWVzc2FnZSwgZ2V0IGEgcmVzcG9uc2UuIE1pbmltYWwgcGVybWlzc2lvbnMg4oCUIEFQSSBrZXkgb25seS4iLCJpZCI6ImFhYWFhYWFhLWFhYWEtNGFhYS1hYWFhLWFhYWFhYWFhYWFhYSIsImlkZW50aXR5Ijp7ImFsZ29yaXRobSI6IkVTMjU2IiwiYXV0aG9yIjoiUm9tYW4gTm9ibGUiLCJlbWFpbCI6InJvbWFuQHB1cmZsZS5kZXYiLCJleHBpcmVzX2F0IjoiMjAyNy0wMy0yOFQwMDowMDowMFoiLCJpc3N1ZWRfYXQiOiIyMDI2LTAzLTI4VDAwOjAwOjAwWiIsImtleV9pZCI6InB1cmZsZS1zYW1wbGVzLWtleSJ9LCJpbyI6eyJpbnB1dCI6eyJwcm9wZXJ0aWVzIjp7Im1lc3NhZ2UiOnsiZGVzY3JpcHRpb24iOiJUaGUgdXNlcidzIG1lc3NhZ2UuIiwidHlwZSI6InN0cmluZyJ9fSwicmVxdWlyZWQiOlsibWVzc2FnZSJdLCJ0eXBlIjoib2JqZWN0In0sIm91dHB1dCI6eyJwcm9wZXJ0aWVzIjp7InJlc3BvbnNlIjp7ImRlc2NyaXB0aW9uIjoiVGhlIGFnZW50J3MgcmVwbHkuIiwidHlwZSI6InN0cmluZyJ9fSwicmVxdWlyZWQiOlsicmVzcG9uc2UiXSwidHlwZSI6Im9iamVjdCJ9fSwibGlmZWN5Y2xlIjp7Im9uX2Vycm9yIjoidGVybWluYXRlIiwicmVzdGFydGFibGUiOnRydWV9LCJuYW1lIjoiUHVyZmxlIENoYXQiLCJwZXJtaXNzaW9ucyI6eyJlbnZpcm9ubWVudCI6eyJhbGxvdyI6WyJHRU1JTklfQVBJX0tFWSJdfX0sInB1cmZsZSI6IjAuMSIsInJ1bnRpbWUiOnsiZW5naW5lIjoiZ2VtaW5pIiwibW9kZWwiOiJnZW1pbmktMi41LWZsYXNoIiwicmVxdWlyZXMiOiJwdXJmbGUvMC4xIn0sInZlcnNpb24iOiIxLjAuMCJ9.IkVetEcDuMNTHigwFjnOkQWmG1yD1xCwZ4t063kcBQ4KO5_Lq_w3-OrqjYNX1adSJOQmpV_XkH05a91pWlIoEA"
   },
   "capabilities": [],
   "permissions": {
     "environment": {
-      "allow": ["ANTHROPIC_API_KEY"]
+      "allow": [
+        "GEMINI_API_KEY"
+      ]
     }
   },
   "lifecycle": {
@@ -25,23 +27,33 @@
   },
   "runtime": {
     "requires": "purfle/0.1",
-    "engine": "anthropic",
-    "model": "claude-haiku-4-5-20251001"
+    "engine": "gemini",
+    "model": "gemini-2.5-flash"
   },
   "io": {
     "input": {
       "type": "object",
       "properties": {
-        "message": { "type": "string", "description": "The user's message." }
+        "message": {
+          "type": "string",
+          "description": "The user's message."
+        }
       },
-      "required": ["message"]
+      "required": [
+        "message"
+      ]
     },
     "output": {
       "type": "object",
       "properties": {
-        "response": { "type": "string", "description": "The agent's reply." }
+        "response": {
+          "type": "string",
+          "description": "The agent's reply."
+        }
       },
-      "required": ["response"]
+      "required": [
+        "response"
+      ]
     }
   }
 }

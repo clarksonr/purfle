@@ -11,4 +11,7 @@ public enum LoadFailureReason
     CapabilityMissing,
     IoSchemaInvalid,
     EngineNotSupported,
+    AssemblyLoadFailed,
+    AssemblyEntryPointMissing,
+    InitFailed,
 }

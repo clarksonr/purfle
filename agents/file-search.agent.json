@@ -1,0 +1,77 @@
+{
+  "purfle": "0.1",
+  "id": "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb",
+  "name": "Downloads File Search",
+  "version": "1.0.0",
+  "description": "Searches file contents in the user's Downloads folder using a grep-like tool. Returns matching lines with file path, line number, and surrounding context.",
+  "identity": {
+    "author": "Roman Noble",
+    "email": "roman@purfle.dev",
+    "key_id": "purfle-samples-key",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-30T00:00:00Z",
+    "expires_at": "2027-03-30T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InB1cmZsZS1zYW1wbGVzLWtleSJ9.eyJjYXBhYmlsaXRpZXMiOlt7ImlkIjoiZmlsZXN5c3RlbSIsInJlcXVpcmVkIjpmYWxzZX1dLCJkZXNjcmlwdGlvbiI6IlNlYXJjaGVzIGZpbGUgY29udGVudHMgaW4gdGhlIHVzZXIncyBEb3dubG9hZHMgZm9sZGVyIHVzaW5nIGEgZ3JlcC1saWtlIHRvb2wuIFJldHVybnMgbWF0Y2hpbmcgbGluZXMgd2l0aCBmaWxlIHBhdGgsIGxpbmUgbnVtYmVyLCBhbmQgc3Vycm91bmRpbmcgY29udGV4dC4iLCJpZCI6ImJiYmJiYmJiLWJiYmItNGJiYi1iYmJiLWJiYmJiYmJiYmJiYiIsImlkZW50aXR5Ijp7ImFsZ29yaXRobSI6IkVTMjU2IiwiYXV0aG9yIjoiUm9tYW4gTm9ibGUiLCJlbWFpbCI6InJvbWFuQHB1cmZsZS5kZXYiLCJleHBpcmVzX2F0IjoiMjAyNy0wMy0zMFQwMDowMDowMFoiLCJpc3N1ZWRfYXQiOiIyMDI2LTAzLTMwVDAwOjAwOjAwWiIsImtleV9pZCI6InB1cmZsZS1zYW1wbGVzLWtleSJ9LCJpbyI6eyJpbnB1dCI6eyJwcm9wZXJ0aWVzIjp7Im1lc3NhZ2UiOnsiZGVzY3JpcHRpb24iOiJUaGUgdXNlcidzIHNlYXJjaCByZXF1ZXN0LiIsInR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbIm1lc3NhZ2UiXSwidHlwZSI6Im9iamVjdCJ9LCJvdXRwdXQiOnsicHJvcGVydGllcyI6eyJyZXNwb25zZSI6eyJkZXNjcmlwdGlvbiI6IlNlYXJjaCByZXN1bHRzIGFuZCBzdW1tYXJ5LiIsInR5cGUiOiJzdHJpbmcifX0sInJlcXVpcmVkIjpbInJlc3BvbnNlIl0sInR5cGUiOiJvYmplY3QifX0sImxpZmVjeWNsZSI6eyJvbl9lcnJvciI6InRlcm1pbmF0ZSIsInJlc3RhcnRhYmxlIjp0cnVlfSwibmFtZSI6IkRvd25sb2FkcyBGaWxlIFNlYXJjaCIsInBlcm1pc3Npb25zIjp7ImVudmlyb25tZW50Ijp7ImFsbG93IjpbIkdFTUlOSV9BUElfS0VZIl19LCJmaWxlc3lzdGVtIjp7InJlYWQiOlsiQzovVXNlcnMvKi9Eb3dubG9hZHMvKiovKi50eHQiLCJDOi9Vc2Vycy8qL0Rvd25sb2Fkcy8qKi8qLm1kIiwiQzovVXNlcnMvKi9Eb3dubG9hZHMvKiovKi5jcyIsIkM6L1VzZXJzLyovRG93bmxvYWRzLyoqLyouanNvbiIsIkM6L1VzZXJzLyovRG93bmxvYWRzLyoqLyoueG1sIiwiQzovVXNlcnMvKi9Eb3dubG9hZHMvKiovKi55YW1sIiwiQzovVXNlcnMvKi9Eb3dubG9hZHMvKiovKi55bWwiLCJDOi9Vc2Vycy8qL0Rvd25sb2Fkcy8qKi8qLmxvZyIsIkM6L1VzZXJzLyovRG93bmxvYWRzLyoqLyouY3N2Il19fSwicHVyZmxlIjoiMC4xIiwicnVudGltZSI6eyJlbmdpbmUiOiJnZW1pbmkiLCJtb2RlbCI6ImdlbWluaS0yLjUtZmxhc2giLCJyZXF1aXJlcyI6InB1cmZsZS8wLjEifSwidmVyc2lvbiI6IjEuMC4wIn0.QTqWm-pahYbrRmvwMAAd_wVkheB_-qlgryVyn_rg3IiRw614TOeIEr2ovI2wSzzF7qJ6pi1gWZKHyUEsgJkn_g"
+  },
+  "capabilities": [
+    {
+      "id": "filesystem",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "filesystem": {
+      "read": [
+        "C:/Users/*/Downloads/**/*.txt",
+        "C:/Users/*/Downloads/**/*.md",
+        "C:/Users/*/Downloads/**/*.cs",
+        "C:/Users/*/Downloads/**/*.json",
+        "C:/Users/*/Downloads/**/*.xml",
+        "C:/Users/*/Downloads/**/*.yaml",
+        "C:/Users/*/Downloads/**/*.yml",
+        "C:/Users/*/Downloads/**/*.log",
+        "C:/Users/*/Downloads/**/*.csv"
+      ]
+    },
+    "environment": {
+      "allow": [
+        "GEMINI_API_KEY"
+      ]
+    }
+  },
+  "lifecycle": {
+    "on_error": "terminate",
+    "restartable": true
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "gemini",
+    "model": "gemini-2.5-flash"
+  },
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "The user's search request."
+        }
+      },
+      "required": [
+        "message"
+      ]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "response": {
+          "type": "string",
+          "description": "Search results and summary."
+        }
+      },
+      "required": [
+        "response"
+      ]
+    }
+  }
+}

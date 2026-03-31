@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -11,7 +12,14 @@ namespace Purfle.Runtime.Manifest;
 /// </summary>
 public static class CanonicalJson
 {
-    private static readonly JsonSerializerOptions s_noWhitespace = new() { WriteIndented = false };
+    // UnsafeRelaxedJsonEscaping matches JavaScript's JSON.stringify behaviour —
+    // non-ASCII characters are written as-is rather than as \uXXXX escapes.
+    // This is required for cross-platform signature compatibility.
+    private static readonly JsonSerializerOptions s_noWhitespace = new()
+    {
+        WriteIndented = false,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     /// <summary>
     /// Serializes <paramref name="node"/> to canonical JSON bytes.

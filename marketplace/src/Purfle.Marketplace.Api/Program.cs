@@ -44,6 +44,9 @@ builder.Services.AddOpenIddict()
         options.AllowAuthorizationCodeFlow()
             .RequireProofKeyForCodeExchange();
 
+        // Allow password grant for local dev tooling (seed scripts, CI).
+        options.AllowPasswordFlow();
+
         // Also allow refresh token flow.
         options.AllowRefreshTokenFlow();
 
@@ -51,14 +54,22 @@ builder.Services.AddOpenIddict()
         options.SetAuthorizationEndpointUris("connect/authorize")
             .SetTokenEndpointUris("connect/token");
 
+        // Register scopes.
+        options.RegisterScopes(
+            OpenIddictConstants.Scopes.OpenId,
+            OpenIddictConstants.Scopes.Email,
+            OpenIddictConstants.Scopes.Profile);
+
         // Use development encryption/signing keys (replace in production).
         options.AddDevelopmentEncryptionCertificate()
             .AddDevelopmentSigningCertificate();
 
         // Register ASP.NET Core host.
+        // DisableTransportSecurityRequirement allows HTTP in development.
         options.UseAspNetCore()
             .EnableAuthorizationEndpointPassthrough()
-            .EnableTokenEndpointPassthrough();
+            .EnableTokenEndpointPassthrough()
+            .DisableTransportSecurityRequirement();
     })
     .AddValidation(options =>
     {
@@ -100,6 +111,7 @@ using (var scope = app.Services.CreateScope())
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
                 OpenIddictConstants.Permissions.Endpoints.Token,
                 OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.Password,
                 OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
                 OpenIddictConstants.Permissions.ResponseTypes.Code,
                 OpenIddictConstants.Permissions.Scopes.Email,

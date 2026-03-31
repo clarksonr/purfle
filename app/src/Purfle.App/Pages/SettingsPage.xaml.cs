@@ -5,18 +5,110 @@ namespace Purfle.App.Pages;
 public partial class SettingsPage : ContentPage
 {
     private readonly MarketplaceService _marketplace;
+    private readonly AgentStore _store;
 
-    public SettingsPage(MarketplaceService marketplace)
+    public SettingsPage(MarketplaceService marketplace, AgentStore store)
     {
         InitializeComponent();
         _marketplace = marketplace;
+        _store = store;
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
         RegistryUrlEntry.Text = _marketplace.BaseUrl;
+        var anthropicKey = await SecureStorage.GetAsync("anthropic_api_key");
+        if (!string.IsNullOrEmpty(anthropicKey))
+            AnthropicKeyEntry.Text = anthropicKey;
+
+        var geminiKey = await SecureStorage.GetAsync("gemini_api_key");
+        if (!string.IsNullOrEmpty(geminiKey))
+            GeminiKeyEntry.Text = geminiKey;
+
+        EnginePicker.SelectedIndex = Preferences.Get("preferred_engine", "") switch
+        {
+            "anthropic" => 1,
+            "gemini"    => 2,
+            _           => 0,
+        };
+
         UpdateAuthStatus();
+    }
+
+    private async void OnInstallBundle(object? sender, EventArgs e)
+    {
+        try
+        {
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Select a .purfle bundle",
+                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    [DevicePlatform.WinUI] = [".purfle"],
+                    [DevicePlatform.macOS] = ["purfle"],
+                }),
+            });
+
+            if (result is null) return;
+
+            // Extract the agent ID from the bundle's manifest.
+            string agentId;
+            using (var zip = System.IO.Compression.ZipFile.OpenRead(result.FullPath))
+            {
+                var entry = zip.GetEntry("agent.manifest.json");
+                if (entry is null)
+                {
+                    await DisplayAlertAsync("Error", "Bundle does not contain agent.manifest.json.", "OK");
+                    return;
+                }
+
+                using var stream = entry.Open();
+                using var doc = await System.Text.Json.JsonDocument.ParseAsync(stream);
+                agentId = doc.RootElement.GetProperty("id").GetString()
+                          ?? throw new InvalidOperationException("Manifest has no 'id' field.");
+            }
+
+            _store.InstallBundle(agentId, result.FullPath);
+            await DisplayAlertAsync("Installed", $"Agent '{agentId}' installed successfully.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Error", ex.Message, "OK");
+        }
+    }
+
+    private async void OnSaveEngine(object? sender, EventArgs e)
+    {
+        var engineKey = EnginePicker.SelectedIndex switch
+        {
+            1 => "anthropic",
+            2 => "gemini",
+            _ => "",
+        };
+        Preferences.Set("preferred_engine", engineKey);
+        await DisplayAlertAsync("Saved", "Engine preference saved.", "OK");
+    }
+
+    private async void OnSaveApiKeys(object? sender, EventArgs e)
+    {
+        var anthropic = AnthropicKeyEntry.Text?.Trim() ?? "";
+        if (string.IsNullOrEmpty(anthropic))
+            SecureStorage.Remove("anthropic_api_key");
+        else
+            await SecureStorage.SetAsync("anthropic_api_key", anthropic);
+        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY",
+            string.IsNullOrEmpty(anthropic) ? null : anthropic);
+
+        var gemini = GeminiKeyEntry.Text?.Trim() ?? "";
+        if (string.IsNullOrEmpty(gemini))
+            SecureStorage.Remove("gemini_api_key");
+        else
+            await SecureStorage.SetAsync("gemini_api_key", gemini);
+        Environment.SetEnvironmentVariable("GEMINI_API_KEY",
+            string.IsNullOrEmpty(gemini) ? null : gemini);
+
+        await DisplayAlertAsync("Saved", "API keys saved.", "OK");
     }
 
     private async void OnSaveUrl(object? sender, EventArgs e)

@@ -8,6 +8,7 @@ using OpenIddict.Server.AspNetCore;
 using Purfle.Marketplace.Core.Entities;
 using Purfle.Marketplace.Shared;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using SignInResult = Microsoft.AspNetCore.Identity.SignInResult;
 
 namespace Purfle.Marketplace.Api.Controllers;
 
@@ -47,7 +48,8 @@ public sealed class AuthController(
 /// </summary>
 [ApiController]
 public sealed class OidcController(
-    UserManager<Publisher> userManager) : ControllerBase
+    UserManager<Publisher> userManager,
+    SignInManager<Publisher> signInManager) : ControllerBase
 {
     /// <summary>
     /// OAuth2 Authorization endpoint — handles the PKCE authorization code flow.
@@ -106,6 +108,35 @@ public sealed class OidcController(
     {
         var request = HttpContext.GetOpenIddictServerRequest()
             ?? throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+        if (request.IsPasswordGrantType())
+        {
+            var user = await userManager.FindByEmailAsync(request.Username!);
+            if (user is null)
+                return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+
+            var result = await signInManager.CheckPasswordSignInAsync(user, request.Password!, lockoutOnFailure: false);
+            if (!result.Succeeded)
+                return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+
+            var identity = new ClaimsIdentity(
+                OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                Claims.Name,
+                Claims.Role);
+
+            identity.AddClaim(Claims.Subject, user.Id);
+            identity.AddClaim(Claims.Name, user.DisplayName);
+            identity.AddClaim(Claims.Email, user.Email!);
+
+            identity.SetDestinations(static claim => claim.Type switch
+            {
+                Claims.Name or Claims.Email => [Destinations.AccessToken, Destinations.IdentityToken],
+                _ => [Destinations.AccessToken],
+            });
+
+            return SignIn(new ClaimsPrincipal(identity),
+                OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
 
         if (request.IsAuthorizationCodeGrantType() || request.IsRefreshTokenGrantType())
         {
