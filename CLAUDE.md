@@ -4,14 +4,32 @@
 
 ---
 
-## Read This First — Mental Model
+## What Purfle Is
 
-Purfle is an **AI Virtual Machine (AIVM)**. It is a sandboxed host process that:
-1. Loads a signed agent package (manifest + .NET DLLs)
-2. Enforces the manifest's declared capabilities and permissions
-3. Provides LLM inference via adapters (Anthropic first, others stubbed)
-4. Exposes tools to the LLM via MCP (Model Context Protocol)
-5. Executes tool calls on behalf of the agent — the LLM never touches the system directly
+Purfle is a **multi-agent AIVM desktop app**. It runs persistently on Windows
+and Mac. The user installs agents — each defined by a signed manifest — and the
+AIVM runs them on a schedule, sandboxed, unattended.
+
+Example agents:
+- `email-monitor` — polls Gmail every 15 minutes, summarizes new mail to a file
+- `pr-watcher` — checks GitHub every 30 minutes for new pull requests
+- `report-builder` — runs at 07:00, reads agent outputs, writes a morning report
+
+The user sees one card per agent in the UI. Agents run in the background.
+The AIVM enforces what each agent is allowed to do.
+
+---
+
+## Mental Model — Read This First
+
+The AIVM is a C# class inside a .NET MAUI desktop app. It:
+1. Loads signed agent manifests from disk
+2. Starts each agent on its own thread on a schedule
+3. Enforces the manifest's declared capabilities and permissions
+4. Provides LLM inference via adapters (Anthropic first)
+5. Exposes tools to the LLM via MCP
+6. Writes agent output to a sandboxed local path
+7. The LLM never touches the system directly — the AIVM executes on its behalf
 
 **The AIVM guards the hen house.** The LLM proposes; the AIVM decides and acts.
 
@@ -31,7 +49,7 @@ my-agent.purfle/
 |---|---|
 | Agent package = MCP server | MCP is a tool protocol used *by* the AIVM |
 | Agent contains the LLM | Runtime provides inference via adapter |
-| Agent holds API keys | Runtime holds credentials (Windows Credential Manager) |
+| Agent holds API keys | Runtime holds credentials (Windows Credential Manager / Mac Keychain) |
 | Agent calls tools directly | AIVM validates capability, then calls tool |
 
 **MCP is plumbing inside the AIVM. It is not the packaging model.**
@@ -41,45 +59,54 @@ my-agent.purfle/
 ## Architecture
 
 ```
-┌──────────────────────────────────────┐
-│          MARKETPLACE                 │  phase 4 — monetized
-├──────────────────────────────────────┤
-│          SDK + TOOLING               │  phase 3 — TypeScript/Node
-├──────────────────────────────────────┤
-│    IDENTITY + TRUST LAYER            │  ← THE KERNEL
-│  signing · audit · revocation        │
-├──────────────────────────────────────┤
-│       MANIFEST SPEC                  │  phase 1 — build this first
-│  identity · capabilities · perms     │
-├──────────────────────────────────────┤
-│    RUNTIME (AIVM)                    │  phase 2 — .NET / C# / Windows
-│  ManifestLoader · Sandbox · LLM      │
-└──────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│           .NET MAUI DESKTOP APP              │
+│                                             │
+│  ┌──────────────────────────────────────┐   │
+│  │              AIVM (C#)               │   │
+│  │                                      │   │
+│  │  Scheduler                           │   │
+│  │  ├── AgentRunner: email-monitor      │   │
+│  │  ├── AgentRunner: pr-watcher         │   │
+│  │  └── AgentRunner: report-builder     │   │
+│  │                                      │   │
+│  │  Each AgentRunner:                   │   │
+│  │  ├── Own thread                      │   │
+│  │  ├── Sandbox (manifest-enforced)     │   │
+│  │  ├── MCP tool connections            │   │
+│  │  ├── LLM adapter                     │   │
+│  │  └── Output → /aivm/output/<id>/     │   │
+│  └──────────────────────────────────────┘   │
+│                                             │
+│  UI: one card per agent                     │
+│  status · last run · next run · log         │
+│  [+ Install Agent]                          │
+└─────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Locked Decisions — Do Not Revisit
 
-- **Identity:** JWS with ES256 (ECDSA). DID migration path later. Do not abstract for DID today.
-- **Algorithm:** ES256 — smaller keys, faster verification than RS256. Locked.
-- **Packaging:** .NET DLL assemblies in `AssemblyLoadContext`. Not MCP servers. Not plugins. DLLs.
-- **Credentials:** Owned by runtime (Windows Credential Manager phase 1). Agent never sees tokens.
-- **Capability model:** Model A — capabilities are the enforcement list; permissions are per-capability config.
+- **Host:** .NET MAUI desktop app — Windows + Mac from one codebase
+- **AIVM:** C# class inside the MAUI app — no separate process or daemon
+- **Agents:** One thread each, isolated AssemblyLoadContext, sandboxed by manifest
+- **Trigger model:** Scheduler built into AIVM — cron or interval declared in manifest
+- **Output:** Local file, AIVM-assigned path under `<app-data>/aivm/output/<agent-id>/`
+- **Identity:** JWS with ES256 (ECDSA). DID migration path later.
+- **Algorithm:** ES256 — locked.
+- **Capability model:** Capabilities are the enforcement list; permissions are per-capability config.
   - You CANNOT have a permissions entry without a matching capability.
-  - You CAN have a capability without a permissions entry (no config needed).
+  - You CAN have a capability without a permissions entry.
+- **Credentials:** Owned by runtime (Windows Credential Manager / Mac Keychain). Agent never sees tokens.
 - **MCP role:** Tool protocol only. Agent declares MCP tool bindings in manifest; AIVM wires them at load time.
-- **`io` block:** Present in schema as optional, no enforcement in phase 1. Deferred to marketplace phase.
-- **Phase 1 target:** Windows / .NET only. No mobile, no edge, no cross-platform yet.
-- **Open core:** spec + runtime + SDK open source. Marketplace monetized.
+- **Cross-agent output sharing:** Deferred — not in phase 1.
+- **`io` block:** Optional in schema, no enforcement in phase 1.
 - **No over-engineering:** No abstractions for hypothetical requirements.
 
 ---
 
 ## Manifest Structure — Canonical Reference
-
-This is the authoritative shape of a Purfle agent manifest. The JSON Schema
-in `spec/schema/agent.manifest.schema.json` is the machine-readable version of this.
 
 ```json
 {
@@ -90,7 +117,7 @@ in `spec/schema/agent.manifest.schema.json` is the machine-readable version of t
   "description": "<string>",
 
   "identity": {
-    "author": "<string — reverse-domain or username>",
+    "author": "<string>",
     "email": "<string>",
     "key_id": "<string>",
     "algorithm": "ES256",
@@ -99,7 +126,13 @@ in `spec/schema/agent.manifest.schema.json` is the machine-readable version of t
     "signature": "<JWS compact serialization — omit at authoring time>"
   },
 
-  "capabilities": ["llm.chat", "network.outbound"],
+  "schedule": {
+    "trigger": "interval | cron | startup",
+    "interval_minutes": 15,
+    "cron": "0 7 * * *"
+  },
+
+  "capabilities": ["llm.chat", "network.outbound", "env.read"],
 
   "permissions": {
     "network.outbound": { "hosts": ["api.anthropic.com"] },
@@ -133,7 +166,7 @@ in `spec/schema/agent.manifest.schema.json` is the machine-readable version of t
 }
 ```
 
-### Capability strings (exhaustive for phase 1)
+### Capability strings (phase 1)
 | Capability | Permission config keys | Meaning |
 |---|---|---|
 | `llm.chat` | none | May use conversational LLM inference |
@@ -144,16 +177,25 @@ in `spec/schema/agent.manifest.schema.json` is the machine-readable version of t
 | `fs.write` | `paths: string[]` | May write to listed paths |
 | `mcp.tool` | none | May invoke MCP tool bindings declared in `tools` |
 
+### Schedule block
+| Field | Type | Meaning |
+|---|---|---|
+| `trigger` | `"interval"` \| `"cron"` \| `"startup"` | How the agent is triggered |
+| `interval_minutes` | integer | Required when trigger is `"interval"` |
+| `cron` | string | Required when trigger is `"cron"` |
+
 ---
 
 ## Stack
 
 | Layer | Technology |
 |---|---|
+| Desktop app + UI | .NET MAUI (C#) |
+| AIVM + runtime | C# class inside MAUI app |
 | Manifest spec | JSON Schema |
 | Agent identity | JWS / ES256 |
-| Runtime host | .NET 8 / C# / Windows |
 | Inference adapter | Anthropic SDK (primary); OpenClaw, Ollama stubbed |
+| Scheduler | System.Threading.PeriodicTimer + NCrontab |
 | SDK / CLI | TypeScript / Node.js (npm workspaces) |
 | Tests | xUnit (.NET), Jest (TypeScript) |
 
@@ -163,8 +205,8 @@ in `spec/schema/agent.manifest.schema.json` is the machine-readable version of t
 
 ```
 purfle/
-├── CLAUDE.md                          ← you are here — keep this current
-├── AGENT_MODEL.md                     ← architecture guardrails, read if confused about MCP
+├── CLAUDE.md
+├── AGENT_MODEL.md
 ├── README.md
 ├── spec/
 │   ├── SPEC.md
@@ -173,29 +215,39 @@ purfle/
 │   │   └── agent.identity.schema.json
 │   ├── examples/
 │   │   ├── hello-world.agent.json
-│   │   └── assistant.agent.json       ← working POC manifest
+│   │   ├── assistant.agent.json
+│   │   └── email-monitor.agent.json
 │   └── rfcs/
 │       └── 0001-identity-model.md
 ├── runtime/
 │   ├── src/
 │   │   ├── Purfle.Runtime/
-│   │   │   ├── Manifest/
-│   │   │   ├── Identity/
-│   │   │   ├── Sandbox/
-│   │   │   └── Lifecycle/
+│   │   │   ├── Manifest/        ← ManifestLoader, ManifestValidator ✓
+│   │   │   ├── Identity/        ← JWS signing/verification
+│   │   │   ├── Sandbox/         ← capability enforcement
+│   │   │   ├── Lifecycle/       ← agent load/unload
+│   │   │   ├── Scheduling/      ← Scheduler, AgentRunner
+│   │   │   └── Adapters/        ← ILlmAdapter, AnthropicAdapter
 │   │   └── Purfle.Runtime.OpenClaw/
 │   ├── tests/
 │   │   └── Purfle.Runtime.Tests/
 │   └── Purfle.Runtime.sln
+├── app/                         ← .NET MAUI desktop app
+│   ├── Purfle.App/
+│   │   ├── MainPage.xaml
+│   │   ├── AgentCardView.xaml
+│   │   └── ViewModels/
+│   └── Purfle.App.sln
 ├── sdk/
 │   ├── packages/
 │   │   ├── cli/src/commands/
-│   │   │   └── simulate.ts            ← working
 │   │   └── core/src/
 │   ├── package.json
 │   └── tsconfig.json
 ├── marketplace/
 └── docs/
+    ├── ARCHITECTURE.md
+    └── ROADMAP.md
 ```
 
 ---
@@ -205,21 +257,24 @@ purfle/
 
 ### What exists and works
 - Monorepo scaffolded
-- TypeScript CLI with `simulate` command — runs a manifest-driven agent
+- TypeScript CLI with `simulate` command — runs a single manifest-driven agent
 - Working LLM-backed terminal chat agent (`assistant.agent.json`) using Anthropic SDK
 - `AGENT_MODEL.md` — architecture guardrails doc
 - .NET solution scaffolded (Manifest/Identity/Sandbox/Lifecycle namespaces, xUnit project)
-- `spec/schema/agent.manifest.schema.json` — formal JSON Schema (phase 1 capability strings, all constraint rules)
-- `spec/schema/agent.identity.schema.json` — identity block schema
-- `spec/rfcs/0001-identity-model.md` — JWS/ES256 identity RFC (accepted)
-- `spec/SPEC.md` — human-readable manifest specification v0.1
-- **`AgentManifest.cs`** — canonical C# record hierarchy (`IdentityBlock`, `RuntimeBlock`, `LifecycleBlock`, `ToolBinding`) aligned with spec
-- **`ManifestLoader.cs`** — file-path loader (`Load(path)`) + `internal static ParseJson(json)` used by `AgentLoader`
-- **`AgentLoader.cs`** — full 7-step load sequence (parse → schema → identity → caps → sandbox → assembly → adapter)
-- **`EmbeddedSchemas.cs`** — updated to canonical schema format (string capabilities, capability-string permission keys)
-- **`CapabilityNegotiator.cs`** — operates on `List<string>` capabilities; all are required; `inference/llm.*` always satisfied
-- **`AgentSandbox.cs`** — canonical `Dictionary<string, JsonElement>?` constructor; `GetPermissions()` exposed for adapters
-- **65 passing tests** across Manifest, Identity, Sandbox, and Integration suites (4 live AI tests skip without API keys)
+- `spec/schema/agent.manifest.schema.json` — complete, includes schedule block, ES256, Model A
+- `spec/schema/agent.identity.schema.json` — identity block standalone schema
+- `spec/examples/hello-world.agent.json` and `assistant.agent.json` — valid, schema-tested
+- `spec/examples/email-monitor.agent.json` — scheduled agent example (interval, 15 min)
+- `spec/SPEC.md` — human-readable specification
+- `spec/rfcs/0001-identity-model.md` — JWS/ES256 identity RFC
+- `runtime/.../Manifest/ManifestLoader.cs` — loads and deserializes manifests, tested
+- `runtime/.../Manifest/AgentManifest.cs` — includes `ScheduleBlock` record
+- `runtime/.../Manifest/EmbeddedSchemas.cs` — includes `scheduleBlock` def
+- **`ILlmAdapter`** — `Purfle.Runtime.Adapters.ILlmAdapter` with `CompleteAsync(systemPrompt, userMessage)`
+- **`AnthropicAdapter`** — implements `IInferenceAdapter` + `ILlmAdapter`; `CompleteAsync` delegates to `InvokeAsync`
+- **`AgentRunner`** — `Purfle.Runtime.Lifecycle`; loads `prompts/system.md` or uses default; calls `ILlmAdapter.CompleteAsync`; appends timestamped entry to `OutputPath/run.log`
+- **`Scheduler`** — `Purfle.Runtime.Anthropic`; creates `AnthropicAdapter` by default; drives `AgentRunner` on `Timer` using `schedule.interval_minutes`
+- **73 passing tests** (8 new `AgentRunnerTests`); 4 live AI tests skip without API keys
 
 ### What does NOT exist yet (priority order)
 1. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`

@@ -1,0 +1,35 @@
+{
+  "purfle": "0.1",
+  "id": "a1b2c3d4-e5f6-4789-abcd-ef0123456789",
+  "name": "Email Monitor",
+  "version": "0.1.0",
+  "description": "Monitors a Gmail inbox on a 15-minute interval and summarises new messages.",
+  "identity": {
+    "author": "clarksonr",
+    "email": "roman@example.com",
+    "key_id": "email-monitor-key-001",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-31T00:00:00Z",
+    "expires_at": "2027-03-31T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImVtYWlsLW1vbml0b3Ita2V5LTAwMSJ9.PLACEHOLDER.PLACEHOLDER"
+  },
+  "capabilities": ["llm.chat", "network.outbound", "env.read", "fs.write"],
+  "permissions": {
+    "network.outbound": { "hosts": ["gmail.googleapis.com"] },
+    "env.read": { "vars": ["ANTHROPIC_API_KEY"] },
+    "fs.write": { "paths": ["./output"] }
+  },
+  "schedule": {
+    "trigger": "interval",
+    "interval_minutes": 15
+  },
+  "lifecycle": {
+    "on_error": "log"
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000
+  }
+}

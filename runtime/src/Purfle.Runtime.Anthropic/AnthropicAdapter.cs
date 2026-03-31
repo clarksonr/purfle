@@ -40,7 +40,7 @@ namespace Purfle.Runtime.Anthropic;
 ///   - <c>runtime.model</c> in the manifest selects the Anthropic model.
 ///     Defaults to <c>claude-sonnet-4-6</c> when not specified.
 /// </summary>
-public sealed class AnthropicAdapter : IInferenceAdapter
+public sealed class AnthropicAdapter : IInferenceAdapter, ILlmAdapter
 {
     private const string ApiEndpoint  = "https://api.anthropic.com/v1/messages";
     private const string ApiVersion   = "2023-06-01";
@@ -177,6 +177,12 @@ public sealed class AnthropicAdapter : IInferenceAdapter
 
         return await InvokeWithToolsAsync(systemPrompt, userMessage, ct);
     }
+
+    // ── ILlmAdapter ──────────────────────────────────────────────────────────────
+
+    /// <inheritdoc/>
+    Task<string> ILlmAdapter.CompleteAsync(string systemPrompt, string userMessage)
+        => InvokeAsync(systemPrompt, userMessage);
 
     // ── Multi-turn interface ─────────────────────────────────────────────────────
 

@@ -47,6 +47,9 @@ internal static class EmbeddedSchemas
             "permissions": {
               "$ref": "#/$defs/permissionsMap"
             },
+            "schedule": {
+              "$ref": "#/$defs/scheduleBlock"
+            },
             "lifecycle": {
               "$ref": "#/$defs/lifecycleBlock"
             },
@@ -109,6 +112,16 @@ internal static class EmbeddedSchemas
               "additionalProperties": false,
               "properties": {
                 "paths": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+              }
+            },
+            "scheduleBlock": {
+              "type": "object",
+              "required": ["trigger"],
+              "additionalProperties": false,
+              "properties": {
+                "trigger": { "type": "string", "enum": ["interval", "cron", "startup"] },
+                "interval_minutes": { "type": "integer", "minimum": 1 },
+                "cron": { "type": "string", "minLength": 1 }
               }
             },
             "lifecycleBlock": {

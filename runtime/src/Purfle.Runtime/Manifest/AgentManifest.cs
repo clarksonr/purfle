@@ -29,6 +29,9 @@ public sealed record AgentManifest
     [JsonPropertyName("permissions")]
     public Dictionary<string, JsonElement>? Permissions { get; init; }
 
+    [JsonPropertyName("schedule")]
+    public ScheduleBlock? Schedule { get; init; }
+
     [JsonPropertyName("runtime")]
     public required RuntimeBlock Runtime { get; init; }
 
@@ -97,6 +100,18 @@ public sealed record LifecycleBlock
     /// <summary>AIVM behaviour on unhandled error: "terminate" | "log" | "ignore".</summary>
     [JsonPropertyName("on_error")]
     public required string OnError { get; init; }
+}
+
+public sealed record ScheduleBlock
+{
+    [JsonPropertyName("trigger")]
+    public required string Trigger { get; init; }
+
+    [JsonPropertyName("interval_minutes")]
+    public int? IntervalMinutes { get; init; }
+
+    [JsonPropertyName("cron")]
+    public string? Cron { get; init; }
 }
 
 public sealed record ToolBinding
