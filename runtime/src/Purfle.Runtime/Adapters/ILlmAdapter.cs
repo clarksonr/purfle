@@ -11,5 +11,6 @@ public interface ILlmAdapter
     /// </summary>
     /// <param name="systemPrompt">System-level instructions for the agent.</param>
     /// <param name="userMessage">The user message for this turn.</param>
-    Task<string> CompleteAsync(string systemPrompt, string userMessage);
+    Task<string> CompleteAsync(string systemPrompt, string userMessage,
+                               CancellationToken ct = default);
 }

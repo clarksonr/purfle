@@ -181,8 +181,9 @@ public sealed class AnthropicAdapter : IInferenceAdapter, ILlmAdapter
     // ── ILlmAdapter ──────────────────────────────────────────────────────────────
 
     /// <inheritdoc/>
-    Task<string> ILlmAdapter.CompleteAsync(string systemPrompt, string userMessage)
-        => InvokeAsync(systemPrompt, userMessage);
+    Task<string> ILlmAdapter.CompleteAsync(string systemPrompt, string userMessage,
+                                            CancellationToken ct)
+        => InvokeAsync(systemPrompt, userMessage, ct);
 
     // ── Multi-turn interface ─────────────────────────────────────────────────────
 

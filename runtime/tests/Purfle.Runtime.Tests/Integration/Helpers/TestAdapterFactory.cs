@@ -1,5 +1,6 @@
 using Purfle.Runtime.Adapters;
 using Purfle.Runtime.Anthropic;
+using AnthropicAdapter = Purfle.Runtime.Anthropic.AnthropicAdapter;
 using Purfle.Runtime.Gemini;
 using Purfle.Runtime.Manifest;
 using Purfle.Runtime.Sandbox;

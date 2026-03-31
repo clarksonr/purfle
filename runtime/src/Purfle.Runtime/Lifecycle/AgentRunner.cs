@@ -37,7 +37,7 @@ public sealed class AgentRunner
         var systemPrompt = await LoadSystemPromptAsync(ct);
         var timestamp    = DateTimeOffset.UtcNow;
         var userMessage  = $"You have been triggered at {timestamp:O}. Perform your task.";
-        var response     = await _adapter.CompleteAsync(systemPrompt, userMessage);
+        var response     = await _adapter.CompleteAsync(systemPrompt, userMessage, ct);
         await WriteLogAsync(timestamp, response, ct);
     }
 
