@@ -63,7 +63,7 @@ export interface AgentLifecycle {
 
 export interface AgentRuntime {
   requires: string;
-  engine: "anthropic" | "openclaw" | "ollama";
+  engine: "anthropic" | "gemini" | "openai-compatible" | "openclaw" | "ollama";
   model?: string;
   max_tokens?: number;
 }

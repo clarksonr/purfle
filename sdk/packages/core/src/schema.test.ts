@@ -154,7 +154,7 @@ describe("validateManifest", () => {
   });
 
   it("accepts all valid engine values", () => {
-    for (const engine of ["anthropic", "openclaw", "ollama"]) {
+    for (const engine of ["anthropic", "gemini", "openai-compatible", "openclaw", "ollama"]) {
       const m = validManifestObj();
       (m.runtime as Record<string, unknown>).engine = engine;
       const result = validateManifest(m);

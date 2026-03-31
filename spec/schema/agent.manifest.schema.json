@@ -230,7 +230,7 @@
         "engine": {
           "type": "string",
           "description": "Inference adapter to use.",
-          "enum": ["anthropic", "openclaw", "ollama"]
+          "enum": ["anthropic", "gemini", "openai-compatible", "openclaw", "ollama"]
         },
         "model": {
           "type": "string",

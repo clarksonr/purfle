@@ -1,0 +1,24 @@
+{
+  "purfle": "0.1",
+  "id": "22222222-2222-4222-a222-222222222222",
+  "name": "Hello World (Gemini)",
+  "version": "0.1.0",
+  "description": "Minimal agent for local demonstration using Gemini.",
+  "identity": {
+    "author": "clarksonr",
+    "email": "roman@example.com",
+    "key_id": "com.clarksonr/release-2026",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-31T00:00:00Z",
+    "expires_at": "2027-03-31T00:00:00Z",
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImNvbS5jbGFya3NvbnIvcmVsZWFzZS0yMDI2In0.eyJjYXBhYmlsaXRpZXMiOlsibGxtLmNoYXQiXSwiZGVzY3JpcHRpb24iOiJNaW5pbWFsIGFnZW50IGZvciBsb2NhbCBkZW1vbnN0cmF0aW9uIHVzaW5nIEdlbWluaS4iLCJpZCI6IjIyMjIyMjIyLTIyMjItNDIyMi1hMjIyLTIyMjIyMjIyMjIyMiIsImlkZW50aXR5Ijp7ImFsZ29yaXRobSI6IkVTMjU2IiwiYXV0aG9yIjoiY2xhcmtzb25yIiwiZW1haWwiOiJyb21hbkBleGFtcGxlLmNvbSIsImV4cGlyZXNfYXQiOiIyMDI3LTAzLTMxVDAwOjAwOjAwWiIsImlzc3VlZF9hdCI6IjIwMjYtMDMtMzFUMDA6MDA6MDBaIiwia2V5X2lkIjoiY29tLmNsYXJrc29uci9yZWxlYXNlLTIwMjYifSwibmFtZSI6IkhlbGxvIFdvcmxkIChHZW1pbmkpIiwicHVyZmxlIjoiMC4xIiwicnVudGltZSI6eyJlbmdpbmUiOiJnZW1pbmkiLCJtb2RlbCI6ImdlbWluaS0yLjUtZmxhc2giLCJyZXF1aXJlcyI6InB1cmZsZS8wLjEifSwidmVyc2lvbiI6IjAuMS4wIn0.38XoX07KvbyXv9g9BIQUsJK_N3MdZFhQ1TWIthaaHKUbgHte_EUL856zmZOUx0041332MZW3aG2JjSB6qfLGbg"
+  },
+  "capabilities": [
+    "llm.chat"
+  ],
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "gemini",
+    "model": "gemini-2.5-flash"
+  }
+}

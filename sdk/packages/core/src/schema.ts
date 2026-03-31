@@ -109,7 +109,7 @@ function getValidator(): ReturnType<Ajv["compile"]> {
         additionalProperties: false,
         properties: {
           requires:   { type: "string", pattern: "^purfle/\\d+\\.\\d+$" },
-          engine:     { type: "string", enum: ["anthropic", "openclaw", "ollama"] },
+          engine:     { type: "string", enum: ["anthropic", "gemini", "openai-compatible", "openclaw", "ollama"] },
           model:      { type: "string" },
           max_tokens: { type: "integer", minimum: 1 },
         },

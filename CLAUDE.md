@@ -270,13 +270,14 @@ purfle/
 - `spec/schema/agent.identity.schema.json` — identity block standalone schema
 - `spec/examples/hello-world.agent.json` and `assistant.agent.json` — valid, schema-tested
 - `spec/examples/email-monitor.agent.json` — scheduled agent example (interval, 15 min)
+- `spec/examples/demo-agent.agent.json` — pre-signed manifest used by `dotnet run` in `Purfle.Runtime.Host`
 - `spec/SPEC.md` — human-readable specification
 - `spec/rfcs/0001-identity-model.md` — JWS/ES256 identity RFC
 - `runtime/.../Manifest/ManifestLoader.cs` — loads and deserializes manifests, tested
 - `runtime/.../Manifest/AgentManifest.cs` — includes `ScheduleBlock` record
 - `runtime/.../Manifest/EmbeddedSchemas.cs` — includes `scheduleBlock` def
 - **`ILlmAdapter`** — `Purfle.Runtime.Adapters.ILlmAdapter` with `CompleteAsync(systemPrompt, userMessage)`
-- **`AnthropicAdapter`** — implements `IInferenceAdapter` + `ILlmAdapter`
+- **`AnthropicAdapter`** — implements `IInferenceAdapter` + `ILlmAdapter`; reads `ANTHROPIC_API_KEY` directly as runtime infrastructure (agents do not need `env.read` for it)
 - **`AgentRunner`** — loads `prompts/system.md`, calls `ILlmAdapter.CompleteAsync`, appends to `run.log`
 - **`Scheduler`** — drives `AgentRunner` on timer using `schedule.interval_minutes`
 - **82 passing tests** (4 live AI tests skip without API keys)
@@ -292,6 +293,12 @@ purfle/
   - `AgentStore` — local install at `~/.purfle/agents/<id>/`; supports raw manifest and `.purfle` ZIP
   - `AppAdapterFactory` — creates `AnthropicAdapter` or `GeminiAdapter` based on engine preference
   - `AgentExecutorService` — ephemeral P-256 re-signing for local dev trust model
+- **Live Azure key registry** — `registry/src/Purfle.KeyRegistry` (three Azure Functions: GET/POST/DELETE `/keys/{id}`)
+  - Deployed at `https://purfle-key-registry-bxa8bmejh6hhdfe0.centralus-01.azurewebsites.net`
+  - `HttpKeyRegistryClient` — encodes key IDs with `"/" → "__"` for Azure Table Storage row key compatibility
+  - `Purfle.Runtime.Host` wired to live registry; `dotnet run` verifies signatures against it end-to-end
+  - Signing key `com.clarksonr/release-2026` registered in Azure Table Storage
+  - Private key at `temp-agent/signing.key.pem` — **do not commit**
 
 ### What does NOT exist yet (priority order)
 1. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`

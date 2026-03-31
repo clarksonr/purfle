@@ -35,8 +35,8 @@ namespace Purfle.Runtime.Anthropic;
 /// </para>
 ///
 /// Requirements:
-///   - The manifest must declare <c>ANTHROPIC_API_KEY</c> in
-///     <c>permissions.environment.allow</c>; the sandbox enforces this.
+///   - <c>ANTHROPIC_API_KEY</c> must be set in the host environment. The runtime
+///     reads it directly — agents do not need to declare <c>env.read</c> for it.
 ///   - <c>runtime.model</c> in the manifest selects the Anthropic model.
 ///     Defaults to <c>claude-sonnet-4-6</c> when not specified.
 /// </summary>
@@ -94,10 +94,6 @@ public sealed class AnthropicAdapter : IInferenceAdapter, ILlmAdapter
         IReadOnlyList<IMcpClient>? mcpClients = null,
         IAgent? agent = null)
     {
-        if (!sandbox.CanReadEnv(EnvApiKey))
-            throw new InvalidOperationException(
-                $"Anthropic adapter requires '{EnvApiKey}' in permissions.environment.allow.");
-
         var key = Environment.GetEnvironmentVariable(EnvApiKey);
         if (string.IsNullOrWhiteSpace(key))
             throw new InvalidOperationException(

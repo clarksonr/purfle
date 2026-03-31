@@ -1,52 +1,24 @@
 {
   "purfle": "0.1",
-  "id": "44444444-4444-4444-a444-444444444444",
-  "name": "Demo Agent",
+  "id": "11111111-1111-4111-a111-111111111111",
+  "name": "Hello World",
   "version": "0.1.0",
-  "description": "Minimal agent for local demonstration. Uses the Anthropic adapter with no required capabilities.",
+  "description": "Minimal agent for local demonstration.",
   "identity": {
-    "author": "Roman Noble",
+    "author": "clarksonr",
     "email": "roman@example.com",
-    "key_id": "demo-key-001",
+    "key_id": "com.clarksonr/release-2026",
     "algorithm": "ES256",
     "issued_at": "2026-03-27T00:00:00Z",
     "expires_at": "2027-03-27T00:00:00Z",
-    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImRlbW8ta2V5LTAwMSJ9.PLACEHOLDER.PLACEHOLDER"
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImNvbS5jbGFya3NvbnIvcmVsZWFzZS0yMDI2In0.eyJjYXBhYmlsaXRpZXMiOlsibGxtLmNoYXQiXSwiZGVzY3JpcHRpb24iOiJNaW5pbWFsIGFnZW50IGZvciBsb2NhbCBkZW1vbnN0cmF0aW9uLiIsImlkIjoiMTExMTExMTEtMTExMS00MTExLWExMTEtMTExMTExMTExMTExIiwiaWRlbnRpdHkiOnsiYWxnb3JpdGhtIjoiRVMyNTYiLCJhdXRob3IiOiJjbGFya3NvbnIiLCJlbWFpbCI6InJvbWFuQGV4YW1wbGUuY29tIiwiZXhwaXJlc19hdCI6IjIwMjctMDMtMjdUMDA6MDA6MDBaIiwiaXNzdWVkX2F0IjoiMjAyNi0wMy0yN1QwMDowMDowMFoiLCJrZXlfaWQiOiJjb20uY2xhcmtzb25yL3JlbGVhc2UtMjAyNiJ9LCJuYW1lIjoiSGVsbG8gV29ybGQiLCJwdXJmbGUiOiIwLjEiLCJydW50aW1lIjp7ImVuZ2luZSI6ImFudGhyb3BpYyIsIm1vZGVsIjoiY2xhdWRlLXNvbm5ldC00LTIwMjUwNTE0IiwicmVxdWlyZXMiOiJwdXJmbGUvMC4xIn0sInZlcnNpb24iOiIwLjEuMCJ9.tzPypFY7dLF-wXzEKGtmG4ajNU0-wSDPxUpBh3tSoN9jj42xj0XLeC7RUtAZ5kfISmnTVvKr5EhAFwKUmuHnzw"
   },
-  "capabilities": [],
-  "permissions": {
-    "network": {
-      "allow": ["https://api.anthropic.com/*"]
-    },
-    "environment": {
-      "allow": ["ANTHROPIC_API_KEY"]
-    }
-  },
-  "lifecycle": {
-    "init_timeout_ms": 5000,
-    "max_runtime_ms": 30000,
-    "on_error": "terminate",
-    "restartable": true
-  },
+  "capabilities": [
+    "llm.chat"
+  ],
   "runtime": {
     "requires": "purfle/0.1",
     "engine": "anthropic",
-    "model": "claude-haiku-4-5"
-  },
-  "io": {
-    "input": {
-      "type": "object",
-      "properties": {
-        "message": { "type": "string" }
-      },
-      "required": ["message"]
-    },
-    "output": {
-      "type": "object",
-      "properties": {
-        "response": { "type": "string" }
-      },
-      "required": ["response"]
-    }
+    "model": "claude-sonnet-4-20250514"
   }
 }

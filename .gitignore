@@ -20,3 +20,4 @@ marketplace/src/Purfle.Marketplace.Api/data/
 # Debug / scratch temp directories
 *TEMP/
 temp-agent/
+temp-agent-*/

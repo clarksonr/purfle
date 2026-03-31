@@ -1,5 +1,4 @@
 using Purfle.Runtime.Adapters;
-using Purfle.Runtime.Anthropic;
 using Purfle.Runtime.Gemini;
 using Purfle.Runtime.Manifest;
 using Purfle.Runtime.Mcp;
@@ -29,7 +28,7 @@ public sealed class AdapterFactory : IAdapterFactory
     public IInferenceAdapter Create(AgentManifest manifest, AgentSandbox sandbox, IAgent? agent = null)
         => manifest.Runtime.Engine switch
         {
-            "anthropic"        => new AnthropicAdapter(manifest, sandbox, _http, _mcpClients, agent),
+            "anthropic" => new Purfle.Runtime.Anthropic.AnthropicAdapter(manifest, sandbox, _http, _mcpClients, agent),
             "gemini"           => new GeminiAdapter(manifest, sandbox, _http, _mcpClients, agent),
             "openai-compatible" => new OpenClawAdapter(),
             "ollama"           => new OllamaAdapter(),
