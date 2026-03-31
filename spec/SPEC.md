@@ -1,56 +1,51 @@
 # Purfle Agent Manifest Specification
 
 **Status:** Draft
-**Version:** 0.1.0
-**Date:** 2026-03-27
+**Version:** 0.1
+**Date:** 2026-03-31
 
 ---
 
-## Abstract
+## 1. Abstract
 
-This document defines the Purfle Agent Manifest — a structured, signable JSON document that describes an AI agent's identity, runtime requirements, capability dependencies, permission scope, lifecycle constraints, and I/O contract. A conforming AIVM uses the manifest to verify, negotiate, sandbox, and execute an agent. No part of an agent executes before the manifest is verified.
+This document defines the Purfle Agent Manifest — a signed JSON document that declares an AI agent's identity, runtime requirements, capability dependencies, permission scope, lifecycle hooks, and tool bindings. A conforming AI Virtual Machine (AIVM) validates the manifest before any agent code executes and enforces its declared constraints for the agent's lifetime. No part of an agent executes before the manifest is verified.
 
 ---
 
-## 1. Motivation
+## 2. Motivation
 
-AI agent frameworks define behavior but not identity and not load-time safety contracts. There is no standard way to answer:
+AI agent frameworks define behavior but not identity and not load-time safety contracts. Without a standard identity and capability declaration, there is no reliable way to answer:
 
 - Who authored this agent, and has it been tampered with since signing?
-- What does this agent need from the host AIVM in order to function?
+- What does this agent need from the host in order to function?
 - What resources is it permitted to access, and how is that enforced?
 - When does its authorization expire?
 
-The absence of load-time negotiation is a specific failure mode: an agent that silently degrades when required capabilities are missing is not safe. It may behave unpredictably, produce incorrect output, or silently escalate to available resources it was not designed to use. The correct behavior is to refuse to load.
+The absence of load-time negotiation is a specific failure mode: an agent that silently degrades when required capabilities are missing is not safe. It may behave unpredictably or silently escalate to host resources it was not designed to use. The correct behavior is to refuse to load.
 
-Purfle solves both problems. The manifest is the unit of distribution and trust. The AIVM enforces the manifest. The agent cannot exceed the scope the manifest declares, and it cannot load on an AIVM that cannot satisfy its declared requirements.
-
-The Purfle runtime is an AI Virtual Machine (AIVM). Like a conventional virtual machine, it is the sole execution environment for the agent. The manifest is the contract. The AIVM enforces it. The agent cannot modify its own sandbox, cannot exceed its declared permissions, and cannot load on a runtime that cannot satisfy its requirements.
+The manifest is the unit of distribution and trust. The AIVM enforces the manifest. An agent cannot exceed the scope the manifest declares and cannot load on an AIVM that cannot satisfy its declared requirements.
 
 ---
 
-## 2. Terminology
+## 3. Terminology
 
 | Term | Definition |
 |---|---|
-| **Agent** | A bounded, autonomous software process that takes structured input and produces structured output using an inference engine or other mechanism. |
-| **Manifest** | A UTF-8 JSON document that fully describes an agent. Signed by the author. Verified by the AIVM before any agent code executes. |
-| **Identity** | The cryptographically verifiable authorship and integrity claim on a manifest. |
-| **Capability** | A named service that the AIVM provides to agents. Agents declare which capabilities they require. |
-| **Runtime capability set** | The enumerable set of capability IDs an AIVM advertises as available at load time. |
-| **Capability negotiation** | The load-time comparison of an agent's declared required capabilities against the runtime capability set. A mismatch on any required capability is a load failure. |
-| **Permission** | A resource or action the AIVM is authorized to grant the agent within the sandbox. |
-| **Sandbox** | The enforced resource boundary derived from the manifest's permissions block. The AIVM creates it; the agent cannot modify or escape it. |
-| **Load failure** | The condition where the AIVM refuses to load an agent. Causes: malformed manifest, schema violation, invalid signature, expired manifest, unsatisfied required capability. |
-| **Signing key** | An asymmetric key pair. The private half signs manifests. The public half is registered in the Purfle key registry. |
+| **AIVM** | AI Virtual Machine. The sandboxed host process that loads, verifies, and executes agent packages. The AIVM is the sole execution environment for an agent; the agent cannot modify or escape it. |
+| **Agent package** | A distributable artifact containing a signed manifest, one or more .NET assemblies, and optional supporting files (prompts, assets). The manifest declares everything the AIVM needs to load and execute the package. |
+| **Manifest** | A UTF-8 JSON document that fully describes an agent package. Signed by the publisher. Verified by the AIVM before any agent code executes. |
+| **Capability** | A named service the AIVM provides to agents. Agents declare which capabilities they require. The AIVM enforces that agents only use declared capabilities. |
+| **Permission** | Per-capability resource configuration that narrows the scope of a granted capability. Permissions are enforced by the AIVM sandbox. |
+| **Publisher** | The individual or organization that signs and distributes an agent package. Identified by `identity.author` and `identity.key_id`. |
+| **Signature** | A JWS Compact Serialization produced by signing the canonical manifest body with the publisher's ES256 private key. Stored in `identity.signature`. |
 
 ---
 
-## 3. Manifest Format
+## 4. Manifest Structure
 
-A manifest is a UTF-8 JSON document. All top-level fields are required unless explicitly marked optional.
+A manifest is a UTF-8 JSON document. Fields marked **required** must be present; the AIVM MUST reject manifests where any required field is absent or fails its type constraint.
 
-### 3.1 Top-Level Structure
+### 4.1 Top-Level Fields
 
 ```json
 {
@@ -62,336 +57,334 @@ A manifest is a UTF-8 JSON document. All top-level fields are required unless ex
   "identity": { ... },
   "capabilities": [ ... ],
   "permissions": { ... },
-  "lifecycle": { ... },
   "runtime": { ... },
-  "io": { ... }
+  "lifecycle": { ... },
+  "tools": [ ... ],
+  "io": {}
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `purfle` | string | Spec version the manifest targets. Pattern: `\d+\.\d+`. |
-| `id` | string | UUID v4. Globally unique manifest identifier. |
-| `name` | string | Human-readable agent name. |
-| `version` | string | Semver agent version. |
-| `description` | string | What the agent does. Max 1024 characters. |
-| `identity` | object | Cryptographic identity block. See §3.2. |
-| `capabilities` | array | Runtime service requirements. See §3.3. |
-| `permissions` | object | Resource access grants. See §3.4. |
-| `lifecycle` | object | Timing and error policy. See §3.5. |
-| `runtime` | object | Inference engine requirements. See §3.6. |
-| `io` | object | Input and output schemas. See §3.7. |
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `purfle` | string | yes | Spec version the manifest targets. Pattern: `\d+\.\d+`. |
+| `id` | string | yes | UUID v4. Globally unique agent identifier. |
+| `name` | string | yes | Human-readable agent name. 1–128 characters. |
+| `version` | string | yes | Semantic version of this agent. |
+| `description` | string | no | What the agent does. Max 1024 characters. |
+| `identity` | object | yes | Cryptographic identity block. See §4.2. |
+| `capabilities` | array | yes | Runtime services this agent requires. See §5. |
+| `permissions` | object | no | Per-capability resource configuration. See §6. |
+| `runtime` | object | yes | Inference engine requirements. See §4.3. |
+| `lifecycle` | object | no | Lifecycle hooks and error policy. See §8. |
+| `tools` | array | no | MCP tool bindings wired by the AIVM at load time. See §4.4. |
+| `io` | object | no | Input/output schema hints. No enforcement in phase 1. |
 
-### 3.2 Identity Block
+### 4.2 Identity Block
 
 ```json
 "identity": {
-  "author": "<string>",
-  "email": "<email>",
-  "key_id": "<string>",
+  "author": "com.example",
+  "email": "author@example.com",
+  "key_id": "key-abc-001",
   "algorithm": "ES256",
-  "issued_at": "<ISO 8601 datetime>",
-  "expires_at": "<ISO 8601 datetime>",
+  "issued_at": "2026-01-01T00:00:00Z",
+  "expires_at": "2027-01-01T00:00:00Z",
   "signature": "<JWS compact serialization>"
 }
 ```
 
-| Field | Description |
-|---|---|
-| `author` | Display name of the author or publishing organization. |
-| `email` | Contact address for the author. |
-| `key_id` | Identifier of the public key registered in the Purfle key registry. In v0.2+, may be a DID string. |
-| `algorithm` | JWA algorithm. `ES256` is the only supported value in v0.1. |
-| `issued_at` | Timestamp of signing. |
-| `expires_at` | Timestamp after which the manifest is invalid. The AIVM MUST reject manifests where `expires_at <= now`. |
-| `signature` | JWS Compact Serialization over the canonical manifest body. See §5. |
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `author` | string | yes | Reverse-domain publisher identifier or username. |
+| `email` | string | yes | Contact address of the publisher. |
+| `key_id` | string | yes | Identifier of the signing key in the Purfle key registry. |
+| `algorithm` | string | yes | JWA algorithm. `ES256` is the only valid value in v0.1. |
+| `issued_at` | string | yes | ISO 8601 datetime when the manifest was signed. |
+| `expires_at` | string | yes | ISO 8601 datetime after which the manifest is invalid. The AIVM MUST reject manifests where `expires_at <= now (UTC)`. |
+| `signature` | string | no | JWS Compact Serialization over the canonical manifest body. Omit at authoring time; added by the signing tool. |
 
-### 3.3 Capabilities
-
-The capabilities array is the agent's declaration of what it requires from the AIVM. Each entry names a service the AIVM must be able to provide. This is the capability negotiation contract.
-
-**Negotiation semantics:**
-
-- A capability with `"required": true` is a hard requirement. If the AIVM's capability set does not include this capability ID, the AIVM MUST refuse to load the agent (load failure).
-- A capability with `"required": false` is optional. If absent from the AIVM's capability set, the AIVM emits a warning and continues loading. The agent is responsible for degrading gracefully.
-- `inference` — basic LLM invocation — is always implicitly required and need not be declared. An AIVM that cannot do inference cannot load any agent.
+### 4.3 Runtime Block
 
 ```json
-"capabilities": [
+"runtime": {
+  "requires": "purfle/0.1",
+  "engine": "anthropic",
+  "model": "claude-sonnet-4-20250514",
+  "max_tokens": 1000
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `requires` | string | yes | Minimum Purfle runtime version. Pattern: `purfle/\d+\.\d+`. |
+| `engine` | string | yes | Inference adapter to use. One of: `anthropic`, `openclaw`, `ollama`. |
+| `model` | string | no | Model identifier passed to the engine adapter. |
+| `max_tokens` | integer | no | Maximum tokens the model may generate per turn. |
+
+An AIVM MUST reject a manifest where `runtime.requires` names a spec version the AIVM does not implement.
+
+### 4.4 Tool Bindings
+
+Each entry in `tools` describes one MCP tool the AIVM wires at load time. Requires the `mcp.tool` capability.
+
+```json
+"tools": [
   {
-    "id": "web-search",
-    "description": "Query a search API; required for primary function.",
-    "required": true
-  },
-  {
-    "id": "text-to-speech",
-    "description": "Synthesize audio responses; agent degrades to text-only if absent.",
-    "required": false
+    "name": "web_search",
+    "server": "http://localhost:5010/mcp",
+    "description": "Search the web for current information."
   }
 ]
 ```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `id` | string | yes | Capability identifier. Must match `^[a-z][a-z0-9-]*$` or be namespaced (see below). |
-| `description` | string | no | Why the agent needs this capability. |
-| `required` | boolean | no | Default `false`. If `true`, load fails when capability is absent. |
+| `name` | string | yes | Tool name exposed to the LLM. |
+| `server` | string | yes | MCP server URL the AIVM connects to for this tool. |
+| `description` | string | no | Human-readable description forwarded to the LLM tool schema. |
 
-**Well-known capability IDs (v0.1):**
+---
 
-| ID | Description |
-|---|---|
-| `inference` | LLM inference. Always implicitly required; declaring it has no effect. |
-| `web-search` | Outbound search requests via the AIVM's search interface. |
-| `filesystem` | Read/write filesystem access. Scope controlled by `permissions.filesystem`. |
-| `mcp-tools` | MCP tool invocation. Permitted tools controlled by `permissions.tools.mcp`. |
-| `code-execution` | Sandboxed code execution. |
-| `text-to-speech` | Audio synthesis from text. |
-| `speech-to-text` | Audio transcription. |
+## 5. Capability Model
 
-Third-party capability IDs MUST use a reverse-domain prefix: `com.example.my-capability`. Unprefixed IDs are reserved for the Purfle capability registry.
+### 5.1 Enforcement Rule
 
-An empty `capabilities` array is valid. It means the agent requires only implicit inference.
+The `capabilities` array is the agent's exhaustive declaration of what it requires from the AIVM. The enforcement rule is:
 
-### 3.4 Permissions
+- **Declared = permitted.** The AIVM provides only the capabilities listed in `capabilities`.
+- **Undeclared = blocked.** Any attempt to use a capability not listed in `capabilities` MUST be denied by the AIVM at runtime.
 
-The permissions block defines the sandbox. The AIVM creates and enforces this boundary before the agent initializes. The AIVM MUST deny access to any resource not explicitly listed. `deny` entries take precedence over `allow` entries.
+`capabilities` is a flat array of capability ID strings:
+
+```json
+"capabilities": ["llm.chat", "network.outbound", "env.read"]
+```
+
+An empty array is valid. The AIVM MUST NOT infer or auto-grant capabilities not declared.
+
+### 5.2 Phase 1 Capability Strings
+
+The following capability IDs are defined for phase 1. No other values are valid in v0.1.
+
+| Capability ID | Permission config keys | Description |
+|---|---|---|
+| `llm.chat` | none | May use conversational (multi-turn) LLM inference. |
+| `llm.completion` | none | May use single-turn LLM completion. |
+| `network.outbound` | `hosts` (string[]) | May make outbound HTTP calls to the listed hostnames. |
+| `env.read` | `vars` (string[]) | May read the listed environment variable names. |
+| `fs.read` | `paths` (string[]) | May read from the listed filesystem paths. |
+| `fs.write` | `paths` (string[]) | May write to the listed filesystem paths. |
+| `mcp.tool` | none | May invoke MCP tool bindings declared in `tools`. |
+
+Capabilities with no permission config keys require no entry in `permissions` (though one may be present as an empty object).
+
+---
+
+## 6. Permission Model
+
+### 6.1 Purpose
+
+Permissions provide per-capability resource configuration. Where a capability names a class of access (`network.outbound`), the permission entry narrows the scope of that access (`hosts: ["api.anthropic.com"]`).
+
+### 6.2 Validity Rule
+
+Every key in `permissions` MUST appear in `capabilities`. A permission entry without a matching capability is a schema violation; the AIVM MUST reject the manifest.
+
+The inverse is not required: a capability MAY appear in `capabilities` without a corresponding entry in `permissions` when that capability requires no configuration (e.g., `llm.chat`, `mcp.tool`).
+
+### 6.3 Permission Config Shapes
+
+**`network.outbound`** — lists hostnames the agent may connect to:
 
 ```json
 "permissions": {
-  "network": {
-    "allow": ["https://api.example.com/*"],
-    "deny": ["*"]
-  },
-  "filesystem": {
-    "read": ["/tmp/agent-workspace"],
-    "write": ["/tmp/agent-workspace"]
-  },
-  "environment": {
-    "allow": ["AGENT_API_KEY"]
-  },
-  "tools": {
-    "mcp": ["file", "search"]
+  "network.outbound": {
+    "hosts": ["api.anthropic.com", "api.example.com"]
   }
 }
 ```
 
-All sub-blocks are optional. An absent sub-block means no access is granted for that resource type.
-
-| Sub-block | Field | Description |
-|---|---|---|
-| `network` | `allow` | URL patterns the agent may access. Glob-style matching. |
-| `network` | `deny` | URL patterns blocked. Takes precedence over `allow`. |
-| `filesystem` | `read` | Absolute paths or glob patterns the agent may read. |
-| `filesystem` | `write` | Absolute paths or glob patterns the agent may write. |
-| `environment` | `allow` | Environment variable names the agent may read. |
-| `tools` | `mcp` | MCP tool identifiers the agent may invoke. |
-
-**Capability/permission relationship:** Declaring a capability that requires a permission scope (e.g., `filesystem`) without declaring the corresponding permission is not a schema error, but the AIVM will enforce an empty scope, which means any attempt to use that capability will fail at runtime. Agents SHOULD declare both consistently.
-
-### 3.5 Lifecycle
+**`env.read`** — lists environment variable names the agent may read:
 
 ```json
-"lifecycle": {
-  "init_timeout_ms": 5000,
-  "max_runtime_ms": 300000,
-  "on_error": "terminate",
-  "restartable": false
-}
-```
-
-| Field | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `init_timeout_ms` | integer | no | 5000 | Max milliseconds allowed from load completion to agent ready state. |
-| `max_runtime_ms` | integer | no | 300000 | Max milliseconds for a single invocation. `0` means no enforced limit. |
-| `on_error` | string | yes | — | AIVM behavior on agent error exit: `terminate`, `suspend`, or `retry`. |
-| `restartable` | boolean | no | false | If `true`, the AIVM MAY restart the agent on clean exit. |
-
-`on_error` values:
-
-- `terminate` — unload the agent immediately
-- `suspend` — pause the agent; await external signal before terminating or resuming
-- `retry` — restart the agent once; if it fails again, treat as `terminate`
-
-### 3.6 Runtime
-
-The runtime block declares the inference engine interface the agent expects. This is distinct from capability negotiation: capabilities name services the AIVM provides; the runtime block specifies the API surface the agent's code targets.
-
-```json
-"runtime": {
-  "requires": "purfle/0.1",
-  "engine": "openai-compatible",
-  "model": "gpt-4o",
-  "adapter": "openclaw"
-}
-```
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `requires` | string | yes | Minimum Purfle spec version. Pattern: `purfle/\d+\.\d+`. |
-| `engine` | string | yes | Inference engine interface: `openai-compatible`, `anthropic`, or `ollama`. |
-| `model` | string | no | Model identifier passed to the engine. |
-| `adapter` | string | no | Runtime adapter hint (e.g., `openclaw`). |
-
-An AIVM MUST reject manifests where `runtime.requires` specifies a spec version greater than the AIVM supports.
-
-### 3.7 I/O Contract
-
-```json
-"io": {
-  "input": {
-    "type": "object",
-    "properties": {
-      "query": { "type": "string" }
-    },
-    "required": ["query"]
-  },
-  "output": {
-    "type": "object",
-    "properties": {
-      "result": { "type": "string" }
-    }
+"permissions": {
+  "env.read": {
+    "vars": ["ANTHROPIC_API_KEY", "APP_CONFIG_PATH"]
   }
 }
 ```
 
-`input` and `output` are JSON Schema fragments (any valid JSON Schema object). The AIVM:
+**`fs.read`** / **`fs.write`** — list filesystem paths the agent may access:
 
-- Compiles both schemas before agent initialization
-- Validates each invocation's input against `io.input` before dispatching to the agent; rejects invalid input
-- Validates each invocation's output against `io.output` before returning to the caller; rejects invalid output
+```json
+"permissions": {
+  "fs.read":  { "paths": ["./data"] },
+  "fs.write": { "paths": ["./output"] }
+}
+```
+
+All paths resolve relative to the repository root.
+
+**`llm.chat`**, **`llm.completion`**, **`mcp.tool`** — no configuration; omit the entry or supply an empty object:
+
+```json
+"permissions": {
+  "llm.chat": {}
+}
+```
+
+### 6.4 Default Stance
+
+The default permission stance is deny-all. An absent `permissions` block grants no resource access beyond what the AIVM implicitly provides. An absent sub-entry for a given capability means the capability is declared but unconstrained by config — the AIVM applies its own default scope for that capability.
 
 ---
 
-## 4. Load Sequence
+## 7. Identity and Signing
 
-A conforming AIVM MUST execute this sequence in order. Failure at any step is a load failure: the agent MUST NOT execute, and the failure reason MUST be reported to the caller.
+### 7.1 Algorithm
 
-```
-1. PARSE
-   Deserialize manifest JSON.
-   Reject if: not valid UTF-8, not valid JSON, root value is not an object.
+All manifests in v0.1 are signed using **ES256** (ECDSA with P-256 and SHA-256), as specified in RFC 7518. No other algorithm is valid. The `identity.algorithm` field MUST equal `"ES256"`.
 
-2. SCHEMA VALIDATION
-   Validate the parsed document against agent.manifest.schema.json.
-   Reject if: any required field is absent, any field fails its type or pattern constraint.
+### 7.2 What Is Signed
 
-3. IDENTITY VERIFICATION
-   a. Retrieve public key for identity.key_id from the Purfle key registry.
-   b. Check key revocation status; reject if revoked.
-   c. Reconstruct the canonical manifest body (see §5.1).
-   d. Verify identity.signature over the canonical body using identity.algorithm.
-   e. Verify identity.expires_at > current UTC time.
-   Reject if: key not found, key revoked, signature invalid, manifest expired.
+The signed payload is the **canonical JSON form** of the manifest body, produced as follows:
 
-4. CAPABILITY NEGOTIATION
-   Obtain the AIVM's capability set.
-   For each entry in capabilities where required == true:
-     If entry.id not in runtime capability set → load failure.
-   For each entry in capabilities where required == false:
-     If entry.id not in runtime capability set → emit warning; continue.
-
-5. PERMISSION BINDING
-   Construct the sandbox from the permissions block.
-   The sandbox is immutable for the lifetime of the agent.
-
-6. I/O SCHEMA COMPILATION
-   Compile io.input and io.output as JSON Schema validators.
-   Reject if: either schema is not a valid JSON Schema object.
-
-7. INITIALIZATION
-   Start the agent within the sandbox.
-   Enforce lifecycle.init_timeout_ms.
-   Reject if: agent does not reach ready state within the timeout.
-```
-
-Steps 1–3 MUST be completed before step 4. Steps 4–6 MAY execute concurrently. Step 7 MUST follow steps 4–6.
-
----
-
-## 5. Signing
-
-### 5.1 Canonical Form
-
-The signed payload is the canonical JSON form of the manifest body. To produce it:
-
-1. Parse the manifest into a JSON value
-2. Remove the `identity.signature` field
-3. Serialize all object keys in lexicographic (Unicode code point) order, recursively
-4. Emit with no whitespace
+1. Parse the manifest into a JSON value.
+2. Remove the `identity.signature` field (the rest of the `identity` block is retained).
+3. Recursively sort all object keys in lexicographic (Unicode code point) order.
+4. Serialize with no whitespace.
 
 The result is a deterministic byte sequence. The same manifest always produces the same canonical form.
 
-### 5.2 JWS Construction
+### 7.3 JWS Construction
 
-Sign the canonical bytes using the algorithm named in `identity.algorithm` (ES256 in v0.1). Encode as JWS Compact Serialization:
+Sign the canonical bytes using ES256. Encode the result as JWS Compact Serialization (RFC 7515 §7.1):
 
 ```
 BASE64URL(header) . BASE64URL(payload) . BASE64URL(signature)
 ```
 
-- `header` — `{"alg":"ES256","kid":"<key_id>"}`, serialized with keys in lexicographic order, no whitespace
-- `payload` — the canonical manifest bytes (not re-encoded; this is a detached-payload JWS variant: the payload bytes are the canonical manifest, not an independently base64url-encoded value)
+- **header** — `{"alg":"ES256","kid":"<key_id>"}`, keys in lexicographic order, no whitespace.
+- **payload** — the canonical manifest bytes.
+- **signature** — the ECDSA signature over the payload.
 
-Store the resulting compact serialization in `identity.signature`.
+Store the resulting compact serialization string in `identity.signature`.
 
-### 5.3 Verification
+### 7.4 AIVM Verification
 
-See load sequence step 3. An AIVM MUST NOT cache key revocation status between agent loads.
+The AIVM MUST perform the following steps in order before loading any agent. Failure at any step is a load failure; the agent MUST NOT execute.
 
----
+1. Retrieve the public key for `identity.key_id` from the Purfle key registry.
+2. Check the key's revocation status; reject if revoked. The AIVM MUST NOT cache revocation status between agent loads.
+3. Reconstruct the canonical manifest body per §7.2.
+4. Verify `identity.signature` over the canonical body using ES256 and the retrieved public key.
+5. Verify that `identity.expires_at > current UTC time`.
 
-## 6. Versioning
+### 7.5 Development Mode
 
-The `purfle` field in the manifest and the `runtime.requires` field both carry spec version strings.
+Unsigned manifests (manifests with `identity.signature` absent or containing a placeholder value) MUST NOT be loaded by a conforming AIVM under normal operation.
 
-- `purfle` — the spec version used when authoring the manifest
-- `runtime.requires` — the minimum spec version the runtime must support
+An AIVM MAY support a `--dev` flag that permits loading unsigned manifests for local development and testing. When `--dev` is active:
 
-A runtime MUST reject a manifest where `runtime.requires` names a version it does not implement. Minor version increments (`0.1` → `0.2`) are additive and backward-compatible by convention; major version increments may not be.
+- The AIVM MUST emit a prominent warning on every load indicating that signature verification is disabled.
+- The `--dev` flag MUST NOT be available or recognized in production deployment configurations.
 
----
-
-## 7. Conformance
-
-### 7.1 Conforming Runtime
-
-A runtime is conforming if it:
-
-- Executes the load sequence in §4 in full and in order
-- Maintains and advertises a stable, enumerable capability set
-- Refuses to load an agent with any unsatisfied required capability
-- Enforces the sandbox derived from `permissions` for the entire agent lifetime
-- Validates invocation inputs against `io.input` and outputs against `io.output`
-- Refuses to execute manifests with invalid, expired, or revoked signatures
-- Does not provide any capability to an agent that is not declared in `permissions`
-
-### 7.2 Conforming Manifest
-
-A manifest is conforming if it:
-
-- Passes JSON Schema validation against `spec/schema/agent.manifest.schema.json`
-- Has a signature that verifies against the declared `key_id`
-- Has `expires_at` in the future at the time of load
-- Declares all capabilities it genuinely requires from the runtime
-- Does not declare permissions broader than the agent's actual access needs
+The specific mechanism for distinguishing development from production environments is TBD.
 
 ---
 
-## 8. Security Considerations
+## 8. Lifecycle
+
+### 8.1 Hooks
+
+The `lifecycle` block declares .NET type hooks invoked by the AIVM at defined points in the agent's lifetime, and the error policy for unhandled exceptions.
+
+```json
+"lifecycle": {
+  "on_load":   "MyAgent.Handlers.LoadHandler, MyAgent",
+  "on_unload": "MyAgent.Handlers.UnloadHandler, MyAgent",
+  "on_error":  "terminate"
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `on_load` | string | no | .NET type invoked after manifest verification and sandbox construction, before first inference. |
+| `on_unload` | string | no | .NET type invoked before the agent is unloaded (clean exit or AIVM shutdown). |
+| `on_error` | string | yes | AIVM behavior when the agent raises an unhandled error. One of: `terminate`, `log`, `ignore`. |
+
+### 8.2 When Hooks Fire
+
+- **`on_load`** fires after the full load sequence completes (manifest verified, sandbox built, capabilities negotiated) and before the agent processes its first input.
+- **`on_unload`** fires on clean shutdown. It is not guaranteed to fire on abrupt process termination or AIVM crash.
+
+### 8.3 .NET Type String Format
+
+Hook values use the .NET assembly-qualified type name format:
+
+```
+Namespace.TypeName, AssemblyName
+```
+
+Example: `MyAgent.Handlers.LoadHandler, MyAgent`
+
+The AIVM resolves the type from the assemblies in the agent package's `lib/` directory, loaded into an isolated `AssemblyLoadContext`. The type MUST implement the interface expected by the AIVM for that hook (TBD — interface definitions are specified in the runtime SDK).
+
+### 8.4 `on_error` Values
+
+| Value | Behavior |
+|---|---|
+| `terminate` | Unload the agent immediately on unhandled error. |
+| `log` | Log the error and continue running. |
+| `ignore` | Suppress the error silently and continue running. |
+
+---
+
+## 9. Versioning
+
+### 9.1 Fields
+
+Two separate version fields appear in a manifest:
+
+- **`purfle`** (top-level) — the spec version used when the manifest was authored. Example: `"0.1"`. Pattern: `\d+\.\d+`.
+- **`runtime.requires`** — the minimum spec version the AIVM must implement to load this agent. Example: `"purfle/0.1"`. Pattern: `purfle/\d+\.\d+`.
+- **`version`** (top-level) — the agent's own semantic version. Independent of the spec version.
+
+### 9.2 Compatibility Rules
+
+- An AIVM MUST reject a manifest where `runtime.requires` names a spec version greater than the AIVM implements.
+- Minor version increments (`0.1` → `0.2`) are additive and backward-compatible by convention: new optional fields may be added; no existing required fields may be removed or renamed.
+- Major version increments may introduce breaking changes. An AIVM implementing `0.x` is not required to load manifests targeting `1.x`.
+
+### 9.3 Agent Versioning
+
+The `version` field is a semantic version (`MAJOR.MINOR.PATCH`) for the agent itself. It is informational for the AIVM; the AIVM does not use it to make load decisions. Publishers are responsible for incrementing agent versions consistently.
+
+---
+
+## 10. Security Considerations
+
+### 10.1 What This Specification Protects
+
+- **Tamper detection.** The signature covers the canonical manifest body. Any modification to manifest content after signing invalidates the signature, and the AIVM MUST reject the manifest.
+- **Identity attribution.** The `identity.key_id` ties a manifest to a registered publisher key. Revocation of that key invalidates all manifests signed with it.
+- **Expiry enforcement.** `identity.expires_at` provides a time-bounded authorization window. Manifests cannot be used indefinitely after signing.
+- **Capability confinement.** The AIVM enforces the declared capability set for the entire agent lifetime. Undeclared capabilities are inaccessible regardless of what agent code requests.
+- **Permission scoping.** The permission block narrows each capability to a declared resource set. An agent with `network.outbound` can only reach the listed hosts. An agent with `env.read` can only read the listed variables.
+- **Credential isolation.** API keys and credentials are owned by the AIVM runtime (Windows Credential Manager in phase 1). The manifest contains no credentials. The agent cannot access credentials outside its declared `env.read` scope.
+
+### 10.2 What This Specification Does Not Protect
+
+- **AIVM compromise.** If the AIVM process itself is compromised, manifest enforcement is moot. The security model assumes the AIVM is trusted.
+- **Agent behavior within declared scope.** The manifest cannot constrain what an agent does within its permitted capabilities. An agent with `fs.write` permission to `./output` may write any content to that path.
+- **Network content.** `network.outbound` restricts which hosts an agent may contact but does not inspect or filter the data transmitted.
+- **Signature algorithm agility attacks.** Only `ES256` is valid in v0.1. Runtimes MUST NOT accept manifests declaring any other algorithm value.
+- **Key registry availability.** If the Purfle key registry is unreachable, the AIVM cannot verify signatures. Caching strategies for offline operation are TBD.
+
+### 10.3 Implementation Requirements
 
 - Private key material MUST NOT appear in the manifest. Only `key_id` is present.
-- Runtimes MUST NOT cache key revocation status. Check status on every load.
-- The default permission stance is deny-all. An absent permission sub-block grants nothing.
-- Runtimes MUST NOT skip signature verification in any mode. Development tooling may use a locally trusted key; it MUST NOT disable verification entirely.
-- Optional capabilities MUST NOT silently expand the agent's access scope. If a capability is absent, its associated permission scope is inert — no access is granted.
-- Agents MUST NOT be loaded if the capability negotiation step (§4, step 4) is skipped or bypassed. Bypassing negotiation defeats the sandbox contract.
-
----
-
-## 9. Future Work
-
-- DID (Decentralized Identifiers) as an alternative to the central key registry — see `spec/rfcs/0001-identity-model.md`
-- AIVM capability advertisement format — a machine-readable document that AIVMs publish describing their capability set and version
-- Hardware attestation — device identity layer (phase 4); capability negotiation accommodates this without spec changes
-- Manifest composition — shared capability block imports across agents
+- Runtimes MUST NOT cache key revocation status between agent loads.
+- Runtimes MUST NOT skip or bypass signature verification in any non-development mode.
+- The `--dev` flag, if supported, MUST NOT be available in production runtime configurations.
+- A permission entry that names a capability absent from `capabilities` is a manifest error. Runtimes MUST reject it.
