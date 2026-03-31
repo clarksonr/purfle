@@ -3,10 +3,6 @@ using System.Text.Json.Serialization;
 
 namespace Purfle.Runtime.Identity;
 
-/// <summary>
-/// Implements <see cref="IKeyRegistry"/> by calling the Purfle Marketplace API.
-/// Target endpoint: GET /api/keys/{keyId}
-/// </summary>
 public sealed class HttpKeyRegistryClient : IKeyRegistry
 {
     private readonly HttpClient _httpClient;
@@ -21,56 +17,47 @@ public sealed class HttpKeyRegistryClient : IKeyRegistry
         _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/") };
     }
 
+    private static string EncodeKeyId(string keyId) => keyId.Replace("/", "__");
+
     public async Task<PublicKey?> GetKeyAsync(string keyId, CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"api/keys/{Uri.EscapeDataString(keyId)}", ct);
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return null;
-
+        var response = await _httpClient.GetAsync($"api/keys/{EncodeKeyId(keyId)}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        if (response.StatusCode == System.Net.HttpStatusCode.Gone) return null;
         response.EnsureSuccessStatusCode();
-
-        var dto = await response.Content.ReadFromJsonAsync<KeyResponse>(ct);
-        if (dto is null)
-            return null;
-
+        var dto = await response.Content.ReadFromJsonAsync<JwkResponse>(ct);
+        if (dto is null) return null;
         return new PublicKey
         {
-            KeyId = dto.KeyId,
-            Algorithm = dto.Algorithm,
-            X = Convert.FromBase64String(dto.X),
-            Y = Convert.FromBase64String(dto.Y),
+            KeyId    = keyId,
+            Algorithm = "ES256",
+            X = Base64UrlDecode(dto.X),
+            Y = Base64UrlDecode(dto.Y),
         };
     }
 
     public async Task<bool> IsRevokedAsync(string keyId, CancellationToken ct = default)
     {
-        var response = await _httpClient.GetAsync($"api/keys/{Uri.EscapeDataString(keyId)}", ct);
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return false;
-
-        response.EnsureSuccessStatusCode();
-
-        var dto = await response.Content.ReadFromJsonAsync<KeyResponse>(ct);
-        return dto?.IsRevoked ?? false;
+        var response = await _httpClient.GetAsync($"api/keys/{EncodeKeyId(keyId)}", ct);
+        return response.StatusCode == System.Net.HttpStatusCode.Gone;
     }
 
-    private sealed record KeyResponse
+    private static byte[] Base64UrlDecode(string s)
     {
-        [JsonPropertyName("keyId")]
-        public required string KeyId { get; init; }
+        s = s.Replace('-', '+').Replace('_', '/');
+        switch (s.Length % 4)
+        {
+            case 2: s += "=="; break;
+            case 3: s += "=";  break;
+        }
+        return Convert.FromBase64String(s);
+    }
 
-        [JsonPropertyName("algorithm")]
-        public required string Algorithm { get; init; }
-
-        [JsonPropertyName("x")]
-        public required string X { get; init; }
-
-        [JsonPropertyName("y")]
-        public required string Y { get; init; }
-
-        [JsonPropertyName("isRevoked")]
-        public bool IsRevoked { get; init; }
+    private sealed record JwkResponse
+    {
+        [JsonPropertyName("kty")] public required string Kty { get; init; }
+        [JsonPropertyName("crv")] public required string Crv { get; init; }
+        [JsonPropertyName("x")]   public required string X   { get; init; }
+        [JsonPropertyName("y")]   public required string Y   { get; init; }
     }
 }
