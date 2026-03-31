@@ -21,6 +21,9 @@
     <Project Path="tools/Purfle.Agents.Seeder/Purfle.Agents.Seeder.csproj" />
     <Project Path="tools/Purfle.Packager/Purfle.Packager.csproj" />
   </Folder>
+  <Folder Name="/registry/src/">
+    <Project Path="registry/src/Purfle.KeyRegistry/Purfle.KeyRegistry.csproj" />
+  </Folder>
   <Folder Name="/marketplace/src/">
     <Project Path="marketplace/src/Purfle.Marketplace.Api/Purfle.Marketplace.Api.csproj" />
     <Project Path="marketplace/src/Purfle.Marketplace.Core/Purfle.Marketplace.Core.csproj" />

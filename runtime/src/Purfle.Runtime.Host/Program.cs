@@ -21,8 +21,24 @@ var manifestFile = Environment.GetEnvironmentVariable("PURFLE_MANIFEST")
 
 var manifestPath = Path.IsPathRooted(manifestFile)
     ? manifestFile
-    : Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(),
-        "..", "..", "..", "spec", "examples", manifestFile));
+    : ResolveManifestPath(manifestFile);
+
+// Walk up from the assembly output directory until we find the repo root
+// (identified by the presence of spec/examples/). This works regardless of
+// the working directory set by the shell, IDE, or test runner.
+static string ResolveManifestPath(string fileName)
+{
+    var dir = AppContext.BaseDirectory;
+    while (dir != null)
+    {
+        var candidate = Path.Combine(dir, "spec", "examples", fileName);
+        if (File.Exists(candidate))
+            return candidate;
+        dir = Path.GetDirectoryName(dir);
+    }
+    // Fall back to spec/examples relative to the current working directory
+    return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "spec", "examples", fileName));
+}
 
 if (!File.Exists(manifestPath))
 {

@@ -298,7 +298,10 @@ purfle/
   - `HttpKeyRegistryClient` — encodes key IDs with `"/" → "__"` for Azure Table Storage row key compatibility
   - `Purfle.Runtime.Host` wired to live registry; `dotnet run` verifies signatures against it end-to-end
   - Signing key `com.clarksonr/release-2026` registered in Azure Table Storage
-  - Private key at `temp-agent/signing.key.pem` — **do not commit**
+  - Private key at `temp-agent/signing.key.pem` — **do not commit**; `temp-agent/` in `.gitignore`
+  - End-to-end trust loop verified: sign → register → load → verify → tamper detection working
+  - `Purfle.KeyRegistry` added to `Purfle.slnx` under `/registry/src/` folder
+- **`Purfle.Runtime.Host/Program.cs`** manifest path fixed — walks up from `AppContext.BaseDirectory` to find repo root (no longer depends on working directory)
 
 ### What does NOT exist yet (priority order)
 1. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`
