@@ -35,7 +35,7 @@ public partial class AgentRunPage : ContentPage
     {
         ShowStatus("Loading agent…", busy: true);
 
-        (IInferenceAdapter? adapter, string agentName, string systemPrompt, string? error) result;
+        (IInferenceAdapter? adapter, string agentName, string description, string systemPrompt, string? error) result;
         try
         {
             result = await _executor.LoadAsync(AgentId!);
@@ -46,7 +46,7 @@ public partial class AgentRunPage : ContentPage
             return;
         }
 
-        var (adapter, agentName, systemPrompt, error) = result;
+        var (adapter, agentName, description, systemPrompt, error) = result;
 
         if (error is not null)
         {
@@ -60,7 +60,10 @@ public partial class AgentRunPage : ContentPage
         Title = agentName;
         ShowChat();
 
-        AddBubble($"Agent \"{agentName}\" loaded. Ask me anything.", isUser: false);
+        var welcome = string.IsNullOrWhiteSpace(description)
+            ? $"Agent \"{agentName}\" loaded. Ask me anything."
+            : $"{agentName}\n\n{description}";
+        AddBubble(welcome, isUser: false);
     }
 
     private async void OnSend(object? sender, EventArgs e)
@@ -79,6 +82,7 @@ public partial class AgentRunPage : ContentPage
         }
         catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[Purfle] AgentRunPage error:\n{ex}");
             reply = $"[Error: {ex.Message}]";
         }
 

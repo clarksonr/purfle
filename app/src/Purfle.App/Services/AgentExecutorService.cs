@@ -1,6 +1,4 @@
-using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using Purfle.Runtime;
 using Purfle.Runtime.Adapters;
 using Purfle.Runtime.Identity;
@@ -13,13 +11,12 @@ namespace Purfle.App.Services;
 /// <summary>
 /// Loads and prepares installed agents for execution.
 ///
-/// Uses the "local dev" trust model: the manifest on disk is trusted as-is.
-/// An ephemeral P-256 key is generated at load time, the manifest is re-signed
-/// with that key, and the key is registered in a <see cref="StaticKeyRegistry"/>.
-/// This lets the full 7-step load sequence run without requiring the original
-/// publisher key to be present locally.
+/// Uses the live key registry (<see cref="IKeyRegistry"/>) to verify agent
+/// signatures via the full 7-step load sequence. Agents must be signed with a
+/// key registered in the registry — ephemeral local-dev re-signing is no longer
+/// used in production code paths.
 /// </summary>
-public sealed class AgentExecutorService(AgentStore store)
+public sealed class AgentExecutorService(AgentStore store, IKeyRegistry registry, CredentialService credentials)
 {
     private const string FallbackSystemPrompt =
         "You are a helpful agent running inside the Purfle AIVM. Be concise.";
@@ -42,16 +39,15 @@ public sealed class AgentExecutorService(AgentStore store)
     /// Returns the inference adapter, the agent's display name, the system prompt to
     /// use (from the agent assembly if present, otherwise a default), and any error message.
     /// </summary>
-    public async Task<(IInferenceAdapter? Adapter, string AgentName, string SystemPrompt, string? Error)>
+    public async Task<(IInferenceAdapter? Adapter, string AgentName, string Description, string SystemPrompt, string? Error)>
         LoadAsync(string agentId, CancellationToken ct = default)
     {
-        // Inject API keys from SecureStorage if not already set in the environment.
-        await InjectKeyAsync("ANTHROPIC_API_KEY", "anthropic_api_key");
-        await InjectKeyAsync("GEMINI_API_KEY",    "gemini_api_key");
+        var anthropicKey = await credentials.GetAnthropicKeyAsync();
+        var geminiKey    = await credentials.GetGeminiKeyAsync();
 
         var installed = store.ListInstalled().FirstOrDefault(a => a.AgentId == agentId);
         if (installed is null)
-            return (null, agentId, FallbackSystemPrompt, $"Agent '{agentId}' is not installed.");
+            return (null, agentId, "", FallbackSystemPrompt, $"Agent '{agentId}' is not installed.");
 
         string manifestJson;
         try
@@ -60,29 +56,7 @@ public sealed class AgentExecutorService(AgentStore store)
         }
         catch (Exception ex)
         {
-            return (null, installed.Name, FallbackSystemPrompt, $"Could not read manifest: {ex.Message}");
-        }
-
-        // Generate an ephemeral key pair and re-sign the manifest so the full
-        // load sequence passes without needing the original publisher key.
-        using var ecKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
-        var p = ecKey.ExportParameters(includePrivateParameters: false);
-        var ephemeralKey = new PublicKey
-        {
-            KeyId     = "local-dev-key",
-            Algorithm = "ES256",
-            X         = p.Q.X!,
-            Y         = p.Q.Y!,
-        };
-
-        string signedJson;
-        try
-        {
-            signedJson = ResignManifest(manifestJson, ecKey, ephemeralKey.KeyId);
-        }
-        catch (Exception ex)
-        {
-            return (null, installed.Name, FallbackSystemPrompt, $"Could not re-sign manifest: {ex.Message}");
+            return (null, installed.Name, "", FallbackSystemPrompt, $"Could not read manifest: {ex.Message}");
         }
 
         // Detect assemblies directory.
@@ -98,30 +72,32 @@ public sealed class AgentExecutorService(AgentStore store)
             _           => (string?)null,
         };
 
-        var registry = new StaticKeyRegistry([ephemeralKey]);
-        var loader   = new AgentLoader(
+        var modelOverride = Preferences.Get("preferred_gemini_model", "") is { Length: > 0 } m ? m : null;
+
+        var loader = new AgentLoader(
             identityVerifier:    new IdentityVerifier(registry),
             runtimeCapabilities: RuntimeCapabilities,
-            adapterFactory:      new AppAdapterFactory(engineOverride));
+            adapterFactory:      new AppAdapterFactory(engineOverride, anthropicKey, geminiKey, modelOverride));
 
         var result = await loader.LoadAsync(
-            signedJson,
+            manifestJson,
             assembliesDirectory: hasAssemblies ? assembliesDir : null,
-            ct: ct);
+            ct: ct,
+            trustedLocalInstall: true);
 
         if (!result.Success)
-            return (null, installed.Name, FallbackSystemPrompt,
+            return (null, installed.Name, "", FallbackSystemPrompt,
                 $"Load failed [{result.FailureReason}]: {result.FailureMessage}");
 
+        var manifest = result.Manifest!;
         var systemPrompt = result.AgentInstance?.SystemPrompt
-                           ?? BuildSystemPrompt(result.Manifest!);
-        return (result.Adapter, installed.Name, systemPrompt, null);
+                           ?? BuildSystemPrompt(manifest);
+        return (result.Adapter, installed.Name, manifest.Description ?? "", systemPrompt, null);
     }
 
     /// <summary>
     /// Builds a system prompt from the manifest when no agent assembly (and its
-    /// <see cref="Purfle.Sdk.IAgent.SystemPrompt"/>) is available. Mentions the
-    /// tools that the adapter will offer so the model knows to call them.
+    /// <see cref="Purfle.Sdk.IAgent.SystemPrompt"/>) is available.
     /// </summary>
     private static string BuildSystemPrompt(AgentManifest manifest)
     {
@@ -141,56 +117,5 @@ public sealed class AgentExecutorService(AgentStore store)
         return sb.ToString();
     }
 
-    private static async Task InjectKeyAsync(string envVar, string storageKey)
-    {
-        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(envVar))) return;
-        var stored = await SecureStorage.GetAsync(storageKey);
-        if (!string.IsNullOrEmpty(stored))
-            Environment.SetEnvironmentVariable(envVar, stored);
-    }
 
-    // ── Re-signing helpers (mirrors runtime/src/Purfle.Runtime.Host/Program.cs) ──
-
-    private static string ResignManifest(string manifestJson, ECDsa key, string keyId)
-    {
-        var dict     = Deserialize(manifestJson);
-        var identity = ToDict(dict["identity"]);
-        identity["key_id"]    = Str(keyId);
-        identity["signature"] = Str("placeholder");
-        dict["identity"]      = Obj(identity);
-
-        var withPlaceholder = JsonSerializer.Serialize(dict);
-        var sig             = ComputeJws(withPlaceholder, key, keyId);
-
-        identity["signature"] = Str(sig);
-        dict["identity"]      = Obj(identity);
-        return JsonSerializer.Serialize(dict);
-    }
-
-    private static string ComputeJws(string manifestJson, ECDsa key, string keyId)
-    {
-        var canonical  = CanonicalJson.ForSigning(manifestJson);
-        var header     = $$$"""{"alg":"ES256","kid":"{{{keyId}}}"}""";
-        var headerB64  = B64(Encoding.UTF8.GetBytes(header));
-        var payloadB64 = B64(canonical);
-        var input      = Encoding.ASCII.GetBytes($"{headerB64}.{payloadB64}");
-        var sig        = key.SignData(input, HashAlgorithmName.SHA256,
-                             DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-        return $"{headerB64}.{payloadB64}.{B64(sig)}";
-    }
-
-    private static string B64(byte[] b) =>
-        Convert.ToBase64String(b).Replace('+', '-').Replace('/', '_').TrimEnd('=');
-
-    private static Dictionary<string, JsonElement> Deserialize(string json) =>
-        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)!;
-
-    private static Dictionary<string, JsonElement> ToDict(JsonElement el) =>
-        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(el.GetRawText())!;
-
-    private static JsonElement Str(string s) =>
-        JsonDocument.Parse(JsonSerializer.Serialize(s)).RootElement;
-
-    private static JsonElement Obj(Dictionary<string, JsonElement> d) =>
-        JsonDocument.Parse(JsonSerializer.Serialize(d)).RootElement;
 }
