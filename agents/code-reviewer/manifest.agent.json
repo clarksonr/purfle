@@ -1,0 +1,37 @@
+{
+  "$schema": "https://purfle.dev/schema/agent.manifest.schema.json",
+  "purfle": "0.1",
+  "agent": {
+    "id": "dev.purfle.code-reviewer",
+    "name": "Code Reviewer",
+    "version": "1.0.0",
+    "description": "Analyzes code for bugs, security issues, and style violations. Returns a structured review with severity levels."
+  },
+  "identity": {
+    "type": "jws",
+    "publicKey": {},
+    "signature": ""
+  },
+  "capabilities": [
+    { "id": "analyze-code", "mcpTool": "mcp://localhost:8106/code/analyze" },
+    { "id": "lint-code", "mcpTool": "mcp://localhost:8106/code/lint" },
+    { "id": "security-scan", "mcpTool": "mcp://localhost:8106/code/security-scan" }
+  ],
+  "permissions": {
+    "filesystem": { "read": ["./workspace"] },
+    "network": { "required": ["generativelanguage.googleapis.com", "api.openai.com"] },
+    "tools": { "mcp": ["mcp://localhost:8106/code/*"] }
+  },
+  "runtime": {
+    "inference": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "fallback": ["openai:gpt-4o"]
+    },
+    "entrypoints": {
+      "dotnet": "csharp/bin/Release/net10.0/CodeReviewer.dll",
+      "node": "typescript/dist/index.js"
+    },
+    "resources": { "memory": "256MB", "timeout": 60000 }
+  }
+}

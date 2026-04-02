@@ -1,0 +1,13 @@
+{
+  "name": "@purfle/agent-code-reviewer",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

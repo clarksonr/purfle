@@ -1,0 +1,14 @@
+{
+  "name": "@purfle/meeting-assistant",
+  "version": "0.1.0",
+  "description": "Meeting assistant agent for Purfle — processes transcripts, extracts decisions and action items.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

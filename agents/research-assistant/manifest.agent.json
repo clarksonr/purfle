@@ -1,0 +1,65 @@
+{
+  "purfle": "0.1",
+  "id": "dev.purfle.research-assistant",
+  "name": "Research Assistant",
+  "version": "0.1.0",
+  "description": "Searches the web, gathers information from multiple sources, synthesizes findings with citations, and produces structured research reports.",
+
+  "identity": {
+    "author": "Purfle Dev",
+    "email": "dev@purfle.dev",
+    "key_id": "dev.purfle/research-assistant-2026",
+    "algorithm": "ES256",
+    "issued_at": "2026-04-01T00:00:00Z",
+    "expires_at": "2027-04-01T00:00:00Z"
+  },
+
+  "schedule": {
+    "trigger": "startup"
+  },
+
+  "capabilities": [
+    "llm.chat",
+    "network.outbound",
+    "mcp.tool"
+  ],
+
+  "permissions": {
+    "network.outbound": {
+      "hosts": ["*"]
+    }
+  },
+
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "gemini",
+    "fallback_engine": "anthropic",
+    "model": "gemini-2.0-flash",
+    "fallback_model": "claude-sonnet-4-20250514",
+    "max_tokens": 4096
+  },
+
+  "lifecycle": {
+    "on_error": "log"
+  },
+
+  "tools": [
+    {
+      "name": "research/web-search",
+      "server": "mcp://localhost:8109/research/web-search",
+      "description": "Search the web for a given query and return ranked results with titles, URLs, and snippets."
+    },
+    {
+      "name": "research/fetch-page",
+      "server": "mcp://localhost:8109/research/fetch-page",
+      "description": "Fetch the full text content of a web page given its URL."
+    },
+    {
+      "name": "research/extract-links",
+      "server": "mcp://localhost:8109/research/extract-links",
+      "description": "Extract all hyperlinks from a web page given its URL."
+    }
+  ],
+
+  "io": {}
+}

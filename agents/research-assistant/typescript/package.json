@@ -1,0 +1,14 @@
+{
+  "name": "@purfle/research-assistant",
+  "version": "0.1.0",
+  "description": "Purfle research assistant agent — searches the web, gathers sources, synthesizes findings with citations.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

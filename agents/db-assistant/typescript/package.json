@@ -1,0 +1,14 @@
+{
+  "name": "@purfle/db-assistant",
+  "version": "1.0.0",
+  "description": "Purfle database assistant agent — analyzes schemas, explains queries, suggests indexes",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

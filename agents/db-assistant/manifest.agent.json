@@ -1,0 +1,36 @@
+{
+  "$schema": "https://purfle.dev/schema/agent.manifest.schema.json",
+  "purfle": "0.1",
+  "agent": {
+    "id": "dev.purfle.db-assistant",
+    "name": "Database Assistant",
+    "version": "1.0.0",
+    "description": "Analyzes SQL schemas, explains query plans, suggests indexes, detects N+1 queries, and recommends optimizations"
+  },
+  "identity": {
+    "type": "jws",
+    "publicKey": {},
+    "signature": ""
+  },
+  "capabilities": [
+    { "id": "db-schema", "mcpTool": "mcp://localhost:8108/db/schema" },
+    { "id": "db-query-explain", "mcpTool": "mcp://localhost:8108/db/query-explain" },
+    { "id": "db-suggest-index", "mcpTool": "mcp://localhost:8108/db/suggest-index" }
+  ],
+  "permissions": {
+    "network": { "required": ["generativelanguage.googleapis.com", "api.openai.com"] },
+    "tools": { "mcp": ["mcp://localhost:8108/db/*"] }
+  },
+  "runtime": {
+    "inference": {
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "fallback": ["openai:gpt-4o"]
+    },
+    "entrypoints": {
+      "dotnet": "csharp/bin/Release/net10.0/DbAssistant.dll",
+      "node": "typescript/dist/index.js"
+    },
+    "resources": { "memory": "256MB", "timeout": 30000 }
+  }
+}

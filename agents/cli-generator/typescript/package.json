@@ -1,0 +1,14 @@
+{
+  "name": "@purfle/cli-generator-agent",
+  "version": "1.0.0",
+  "description": "CLI Generator agent — scaffolds CLI apps, adds commands, generates help",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

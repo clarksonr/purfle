@@ -1,0 +1,68 @@
+{
+  "purfle": "0.1",
+  "id": "dev.purfle.meeting-assistant",
+  "name": "Meeting Assistant",
+  "version": "0.1.0",
+  "description": "Processes meeting transcripts to extract key decisions, action items with owners, and generate concise meeting notes.",
+
+  "identity": {
+    "author": "Purfle Team",
+    "email": "team@purfle.dev",
+    "key_id": "dev.purfle/meeting-assistant-2026",
+    "algorithm": "ES256",
+    "issued_at": "2026-04-01T00:00:00Z",
+    "expires_at": "2027-04-01T00:00:00Z"
+  },
+
+  "schedule": {
+    "trigger": "startup"
+  },
+
+  "capabilities": [
+    "llm.chat",
+    "mcp.tool",
+    "network.outbound"
+  ],
+
+  "permissions": {
+    "network.outbound": {
+      "hosts": [
+        "generativelanguage.googleapis.com",
+        "api.anthropic.com"
+      ]
+    }
+  },
+
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "gemini",
+    "fallback_engine": "anthropic",
+    "model": "gemini-2.0-flash",
+    "fallback_model": "claude-sonnet-4-20250514",
+    "max_tokens": 4096
+  },
+
+  "lifecycle": {
+    "on_error": "log"
+  },
+
+  "tools": [
+    {
+      "name": "meeting/transcribe",
+      "server": "mcp://localhost:8107/meeting/transcribe",
+      "description": "Transcribes audio or raw text input into a structured meeting transcript."
+    },
+    {
+      "name": "meeting/summarize",
+      "server": "mcp://localhost:8107/meeting/summarize",
+      "description": "Generates a concise summary from a meeting transcript."
+    },
+    {
+      "name": "meeting/action-items",
+      "server": "mcp://localhost:8107/meeting/action-items",
+      "description": "Extracts action items with owners and deadlines from a meeting transcript."
+    }
+  ],
+
+  "io": {}
+}
