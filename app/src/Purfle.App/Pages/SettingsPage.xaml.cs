@@ -17,6 +17,7 @@ public partial class SettingsPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        LoadStats();
         RegistryUrlEntry.Text = _marketplace.BaseUrl;
         var anthropicKey = await SecureStorage.GetAsync("anthropic_api_key");
         if (!string.IsNullOrEmpty(anthropicKey))
@@ -183,6 +184,102 @@ public partial class SettingsPage : ContentPage
         catch (Exception ex)
         {
             await DisplayAlertAsync("Error", ex.Message, "OK");
+        }
+    }
+
+    private void LoadStats()
+    {
+        var installed = _store.ListInstalled();
+        long totalInputTokens = 0, totalOutputTokens = 0;
+
+        var outputBase = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "aivm", "output");
+
+        if (Directory.Exists(outputBase))
+        {
+            foreach (var dir in Directory.EnumerateDirectories(outputBase))
+            {
+                var jsonlPath = Path.Combine(dir, "run.jsonl");
+                if (!File.Exists(jsonlPath)) continue;
+                try
+                {
+                    foreach (var line in File.ReadLines(jsonlPath))
+                    {
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+                        using var doc = System.Text.Json.JsonDocument.Parse(line);
+                        if (doc.RootElement.TryGetProperty("input_tokens", out var it))
+                            totalInputTokens += it.GetInt64();
+                        if (doc.RootElement.TryGetProperty("output_tokens", out var ot))
+                            totalOutputTokens += ot.GetInt64();
+                    }
+                }
+                catch { /* skip malformed entries */ }
+            }
+        }
+
+        StatsLabel.Text = $"Installed agents: {installed.Count}\n" +
+                          $"All-time tokens: {totalInputTokens} in / {totalOutputTokens} out";
+    }
+
+    private async void OnTestConnection(object? sender, EventArgs e)
+    {
+        TestConnectionLabel.Text = "Testing...";
+        TestConnectionLabel.TextColor = Colors.Gray;
+
+        var anthropicKey = AnthropicKeyEntry.Text?.Trim();
+        if (!string.IsNullOrEmpty(anthropicKey))
+        {
+            try
+            {
+                using var http = new HttpClient();
+                http.DefaultRequestHeaders.Add("x-api-key", anthropicKey);
+                http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+                var content = new StringContent(
+                    """{"model":"claude-haiku-4-5-20251001","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}""",
+                    System.Text.Encoding.UTF8, "application/json");
+                var resp = await http.PostAsync("https://api.anthropic.com/v1/messages", content);
+                TestConnectionLabel.Text = resp.IsSuccessStatusCode
+                    ? "Anthropic: Connected"
+                    : $"Anthropic: {(int)resp.StatusCode}";
+                TestConnectionLabel.TextColor = resp.IsSuccessStatusCode ? Colors.Green : Colors.Red;
+            }
+            catch (Exception ex)
+            {
+                TestConnectionLabel.Text = $"Anthropic: {ex.Message}";
+                TestConnectionLabel.TextColor = Colors.Red;
+            }
+        }
+        else
+        {
+            TestConnectionLabel.Text = "No API key entered.";
+            TestConnectionLabel.TextColor = Colors.Orange;
+        }
+    }
+
+    private async void OnClearOutput(object? sender, EventArgs e)
+    {
+        bool confirm = await DisplayAlertAsync("Clear Output",
+            "This will delete all agent output files. This cannot be undone.", "Clear", "Cancel");
+        if (!confirm) return;
+
+        var outputBase = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "aivm", "output");
+
+        if (Directory.Exists(outputBase))
+        {
+            try
+            {
+                Directory.Delete(outputBase, recursive: true);
+                Directory.CreateDirectory(outputBase);
+                await DisplayAlertAsync("Cleared", "All agent output has been deleted.", "OK");
+                LoadStats();
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlertAsync("Error", ex.Message, "OK");
+            }
         }
     }
 
