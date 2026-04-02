@@ -4,6 +4,11 @@
              x:Class="Purfle.App.Pages.AgentRunPage"
              Title="Run Agent">
 
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Export"
+                     Clicked="OnExport" />
+    </ContentPage.ToolbarItems>
+
     <Grid RowDefinitions="*,Auto">
 
         <!-- Messages / status area -->
@@ -25,7 +30,7 @@
                                    IsRunning="True"
                                    HorizontalOptions="Center" />
                 <Label x:Name="StatusLabel"
-                       Text="Loading agent…"
+                       Text="Loading agent..."
                        HorizontalOptions="Center"
                        TextColor="Gray"
                        FontSize="14" />
@@ -40,7 +45,7 @@
               ColumnSpacing="8"
               BackgroundColor="{AppThemeBinding Light={StaticResource White}, Dark={StaticResource Black}}">
             <Entry x:Name="MessageEntry"
-                   Placeholder="Ask something…"
+                   Placeholder="Ask something..."
                    IsEnabled="False"
                    ReturnType="Send"
                    Completed="OnSend" />
