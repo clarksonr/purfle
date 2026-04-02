@@ -113,12 +113,22 @@ public sealed class AnthropicAdapter : IInferenceAdapter, ILlmAdapter
         {
             foreach (var client in mcpClients)
             {
-                var tools = client.ListToolsAsync().GetAwaiter().GetResult();
-                foreach (var tool in tools)
+                try
                 {
-                    if (!sandbox.CanUseMcpTool(tool.Name)) continue;
-                    mcpRoutes[tool.Name] = client;
-                    mcpToolDefs.Add(BuildMcpToolDefinition(tool));
+                    var tools = client.ListToolsAsync().GetAwaiter().GetResult();
+                    foreach (var tool in tools)
+                    {
+                        if (!sandbox.CanUseMcpTool(tool.Name)) continue;
+                        mcpRoutes[tool.Name] = client;
+                        mcpToolDefs.Add(BuildMcpToolDefinition(tool));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // MCP server unreachable at load time — log and skip, do not crash.
+                    Console.Error.WriteLine(
+                        $"[AnthropicAdapter] MCP server unreachable at load: {ex.Message}. " +
+                        "Skipping tool registration for this server.");
                 }
             }
         }

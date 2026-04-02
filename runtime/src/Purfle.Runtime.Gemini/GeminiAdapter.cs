@@ -73,12 +73,21 @@ public sealed class GeminiAdapter : IInferenceAdapter
         {
             foreach (var client in mcpClients)
             {
-                var tools = client.ListToolsAsync().GetAwaiter().GetResult();
-                foreach (var tool in tools)
+                try
                 {
-                    if (!sandbox.CanUseMcpTool(tool.Name)) continue;
-                    mcpRoutes[tool.Name] = client;
-                    mcpToolDefs.Add(BuildMcpFunctionDeclaration(tool));
+                    var tools = client.ListToolsAsync().GetAwaiter().GetResult();
+                    foreach (var tool in tools)
+                    {
+                        if (!sandbox.CanUseMcpTool(tool.Name)) continue;
+                        mcpRoutes[tool.Name] = client;
+                        mcpToolDefs.Add(BuildMcpFunctionDeclaration(tool));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(
+                        $"[GeminiAdapter] MCP server unreachable at load: {ex.Message}. " +
+                        "Skipping tool registration for this server.");
                 }
             }
         }
