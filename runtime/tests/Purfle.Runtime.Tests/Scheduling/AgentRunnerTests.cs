@@ -93,6 +93,34 @@ public sealed class AgentRunnerTests
         Assert.Contains("ERROR", content);
     }
 
+    // ── Token usage ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RunOnceAsync_CapturesTokenUsageFromAdapter()
+    {
+        var adapter = new FakeLlmAdapter("done", inputTokens: 42, outputTokens: 17);
+        var runner  = new AgentRunner(MakeManifest(), adapter);
+
+        await runner.RunOnceAsync();
+
+        Assert.Equal((42, 17), runner.LastTokenUsage);
+    }
+
+    [Fact]
+    public async Task RunOnceAsync_WritesTokenUsageToStructuredLog()
+    {
+        var adapter = new FakeLlmAdapter("done", inputTokens: 100, outputTokens: 50);
+        var runner  = new AgentRunner(MakeManifest(), adapter);
+
+        await runner.RunOnceAsync();
+
+        var logPath = Path.Combine(runner.OutputPath, "run.jsonl");
+        Assert.True(File.Exists(logPath));
+        var json = await File.ReadAllTextAsync(logPath);
+        Assert.Contains("\"input_tokens\":100", json);
+        Assert.Contains("\"output_tokens\":50", json);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static AgentManifest MakeManifest(
@@ -123,21 +151,26 @@ public sealed class AgentRunnerTests
     {
         private readonly bool   _throws;
         private readonly string _response;
+        private readonly int    _inputTokens;
+        private readonly int    _outputTokens;
 
         public List<CallRecord> Calls { get; } = [];
 
-        public FakeLlmAdapter(string response = "ok", bool throws = false)
+        public FakeLlmAdapter(string response = "ok", bool throws = false,
+                              int inputTokens = 0, int outputTokens = 0)
         {
-            _response = response;
-            _throws   = throws;
+            _response     = response;
+            _throws       = throws;
+            _inputTokens  = inputTokens;
+            _outputTokens = outputTokens;
         }
 
-        public Task<string> CompleteAsync(string systemPrompt, string userMessage,
+        public Task<LlmResult> CompleteAsync(string systemPrompt, string userMessage,
                                           CancellationToken ct = default)
         {
             if (_throws) throw new InvalidOperationException("Adapter failed");
             Calls.Add(new CallRecord(systemPrompt, userMessage));
-            return Task.FromResult(_response);
+            return Task.FromResult(new LlmResult(_response, _inputTokens, _outputTokens));
         }
     }
 }

@@ -179,11 +179,11 @@ public sealed class AgentRunnerTests
     {
         public List<CallRecord> Calls { get; } = [];
 
-        public Task<string> CompleteAsync(string systemPrompt, string userMessage,
+        public Task<LlmResult> CompleteAsync(string systemPrompt, string userMessage,
                                           CancellationToken ct = default)
         {
             Calls.Add(new CallRecord(systemPrompt, userMessage));
-            return Task.FromResult(response);
+            return Task.FromResult(new LlmResult(response));
         }
     }
 }

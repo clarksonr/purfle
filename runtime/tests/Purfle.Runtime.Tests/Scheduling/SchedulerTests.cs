@@ -92,8 +92,8 @@ public sealed class SchedulerTests
 
     private sealed class FakeLlmAdapter : ILlmAdapter
     {
-        public Task<string> CompleteAsync(string systemPrompt, string userMessage,
+        public Task<LlmResult> CompleteAsync(string systemPrompt, string userMessage,
                                           CancellationToken ct = default)
-            => Task.FromResult("ok");
+            => Task.FromResult(new LlmResult("ok"));
     }
 }
