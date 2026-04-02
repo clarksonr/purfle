@@ -7,6 +7,7 @@ using System.Windows.Input;
 public sealed class AgentCardViewModel : INotifyPropertyChanged
 {
     private readonly AgentRunner _runner;
+    private static readonly Purfle.App.Services.NotificationService s_notifier = new();
     private IDispatcherTimer?    _timer;
     private bool                 _errorExpanded;
     private double               _statusDotOpacity = 1.0;
@@ -114,12 +115,18 @@ public sealed class AgentCardViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(ErrorText));
 
-        // Refresh output preview after a run completes
+        // Refresh output preview after a run completes and fire notifications
         if (prevStatus == AgentStatus.Running && Status != AgentStatus.Running)
         {
             LoadOutputPreview();
             OnPropertyChanged(nameof(OutputPreview));
             OnPropertyChanged(nameof(HasOutputPreview));
+
+            // System tray notifications
+            if (Status == AgentStatus.Error)
+                s_notifier.NotifyError(Name, _runner.LastError ?? "Unknown error");
+            else if (Status == AgentStatus.Idle && _runner.LastRun.HasValue)
+                s_notifier.NotifyCompletion(Name);
         }
     }
 
