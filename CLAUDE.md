@@ -245,6 +245,10 @@ purfle/
 │   │   └── Purfle.TestAgents.Hello/ ← real agent DLL for assembly load tests
 │   └── Purfle.Runtime.sln
 ├── agents/                      ← example agent packages
+│   ├── DOGFOOD.md               ← dogfood setup guide
+│   ├── email-monitor/           ← dogfood: Gmail poller (15 min interval)
+│   ├── pr-watcher/              ← dogfood: GitHub PR watcher (30 min interval)
+│   ├── report-builder/          ← dogfood: morning report (cron 07:00)
 │   ├── chat.agent.json
 │   ├── file-search.agent.json
 │   ├── file-summarizer.agent.json
@@ -264,9 +268,11 @@ purfle/
 │           ├── Pages/            ← Search, MyAgents, Settings, AgentRun, AgentDetail, LogView
 │           ├── Controls/         ← AgentCard
 │           ├── ViewModels/       ← MainViewModel, AgentCardViewModel
-│           └── Services/         ← AgentStore, AgentExecutorService, AppAdapterFactory, MarketplaceService
+│           └── Services/         ← AgentStore, AgentExecutorService, AppAdapterFactory, MarketplaceService, CredentialService, NotificationService
 ├── tools/
-│   └── mcp-file-server/             ← MCP server for file tools (read, list, search)
+│   ├── mcp-file-server/             ← MCP server for file tools (read, list, search)
+│   ├── mcp-gmail/                   ← Gmail mock (GET + POST endpoints)
+│   └── mcp-github/                  ← GitHub PR mock (GET + POST endpoints)
 ├── marketplace/
 │   ├── src/
 │   │   ├── Purfle.Marketplace.Api/  ← ASP.NET Core (Agents, Auth, Keys, Publishers, Attestations)
@@ -309,18 +315,19 @@ purfle/
 - `Manifest/` — ManifestLoader, ManifestValidator, AgentManifest with ScheduleBlock
 - `Identity/` — IdentityVerifier, JWS ES256 sign/verify, IKeyRegistry, HttpKeyRegistryClient
 - `Sandbox/` — CapabilityNegotiator, AgentSandbox (network, filesystem, env, MCP enforcement)
-- `Lifecycle/` — LoadResult, LoadFailureReason enum (12 failure reasons)
+- `Lifecycle/` — LoadResult, LoadFailureReason enum (13 failure reasons incl. IdentityExpired)
 - `Tools/` — BuiltInToolExecutor (read_file, write_file, http_get, find_files, search_files)
 - `Sessions/` — ConversationSession for multi-turn chat
 - `Adapters/` — ILlmAdapter, IInferenceAdapter interfaces
-- `Purfle.Runtime.Anthropic` — AnthropicAdapter (reads ANTHROPIC_API_KEY as runtime infra)
-- `Purfle.Runtime.Gemini` — GeminiAdapter
+- `Purfle.Runtime.Anthropic` — AnthropicAdapter (reads ANTHROPIC_API_KEY as runtime infra, exponential backoff on 429/timeout)
+- `Purfle.Runtime.Gemini` — GeminiAdapter (exponential backoff on 429/timeout)
 - `Purfle.Runtime.OpenClaw` — full OpenAI adapter (gpt-4o default, multi-turn)
 - `Purfle.Runtime.Ollama` — full Ollama adapter (llama3 default, localhost:11434)
 - `Ipc/` — IpcRequest, IpcResponse, IpcToolCall, IpcToolResult, ProcessAgentRunner
 - `Platform/` — ICredentialStore, CredentialStoreFactory, Windows/macOS/Linux/InMemory stores
-- `Scheduler` — drives AgentRunner on timer using schedule.interval_minutes
-- `AgentRunner` — loads prompts/system.md, calls ILlmAdapter.CompleteAsync, appends to run.log
+- `Scheduler` — drives AgentRunner on timer, skips overlapping runs, isolates agent crashes
+- `AgentRunner` — loads prompts/system.md, calls ILlmAdapter.CompleteAsync, structured logging (run.jsonl + run.log)
+- `RunLogEntry` — structured JSON log: agent_id, trigger_time, duration_ms, token usage, status, error
 - `Assembly/` — AgentAssemblyLoadContext (collectible, isolated per agent, Purfle.Sdk shared via default ALC)
 - `Mcp/` — IMcpClient, McpClient (stdio JSON-RPC 2.0, raw BaseStream writes for Windows pipe compat)
 - `Purfle.TestAgents.Hello` — test agent DLL with HelloAgent (IAgent) + GreetTool (IAgentTool)
@@ -346,17 +353,21 @@ purfle/
 - `ScheduleBlock` type added to manifest.ts (interval, cron, startup)
 - **73 passing core tests**, **16 passing CLI tests**
 
-**Desktop App (Phase 3 — Complete)**
+**Desktop App (Phase 3+5 — Enhanced)**
 - .NET MAUI desktop app — builds for Windows and Mac
 - Pages: Search (marketplace browser), MyAgents (agent cards), Settings, AgentRun (chat UI), AgentDetail, LogView
-- `AgentCard` control — name, status, last/next run, View Log button
-- `AgentCardViewModel` — wraps AgentRunner, polls status every 5s
-- `MainViewModel` — ObservableCollection<AgentCardViewModel>, AddAgentCommand
+- `AgentCard` — output preview (last 2 lines), status indicator (grey/orange/red/green with pulse animation), Run Now button, token usage, error badge with tap-to-expand
+- `AgentCardViewModel` — wraps AgentRunner, polls status every 5s, fires system tray notifications on completion/error
+- `MainViewModel` — ObservableCollection, AddAgentCommand, RefreshCommand, SortCommand (name/lastrun/nextrun/status)
+- `MyAgentsPage` — empty state with CTA, pull-to-refresh, sort controls
+- `LogViewPage` — structured collapsible entries (timestamp/duration/status), filter (All/Success/Error), copy-to-clipboard, JSONL + text fallback
+- `AgentRunPage` — inline tool call display (collapsed default), token count per message, export conversation to file
+- `SettingsPage` — marketplace URL, engine picker, API key storage, OAuth PKCE, agent stats (count + all-time tokens), test connection button, clear all output with confirmation
 - `AgentStore` — local install at `~/.purfle/agents/<id>/`; supports raw manifest and `.purfle` ZIP
-- `AppAdapterFactory` — creates AnthropicAdapter or GeminiAdapter based on engine preference
-- `AgentExecutorService` — ephemeral P-256 re-signing for local dev trust model
-- `SettingsPage` — marketplace URL, engine picker, API key storage, OAuth PKCE login
-- `AgentRunPage` — interactive chat UI backed by ConversationSession with welcome bubble
+- `AppAdapterFactory` — creates AnthropicAdapter or GeminiAdapter, supports API key + engine + model override
+- `AgentExecutorService` — uses live key registry for signature verification
+- `CredentialService` — retrieves API keys from SecureStorage with env var fallback
+- `NotificationService` — Windows toast notifications for agent completion/error
 
 **Polyglot Agents (Marathon Build — C# + TypeScript)**
 - `agents/file-assistant/` — file read/list/search/summarize (C# + TS)
@@ -377,10 +388,10 @@ purfle/
 - `agents/file-summarizer.agent.json` — file summarization agent
 - `agents/web-research.agent.json` + `Purfle.Agents.WebResearch` — web research with link extraction
 
-**MCP Servers (11 total, ports 8100–8110)**
+**MCP Servers (12 total, ports 8100–8111)**
 - `tools/mcp-file-server/` (8100) — file read/list/search
 - `tools/mcp-microsoft-email/` (8101) — Microsoft Graph email
-- `tools/mcp-gmail/` (8102) — Gmail API email
+- `tools/mcp-gmail/` (8102) — Gmail API email (GET + POST endpoints)
 - `tools/mcp-news/` (8103) — news headlines/search/sources
 - `tools/mcp-pet/` (8104) — pet state management
 - `tools/mcp-api-tools/` (8105) — API health/latency/schema-diff
@@ -389,6 +400,7 @@ purfle/
 - `tools/mcp-db-tools/` (8108) — schema/query-explain/suggest-index
 - `tools/mcp-research/` (8109) — web-search/fetch-page/extract-links
 - `tools/mcp-cli-gen/` (8110) — CLI scaffold/add-command/generate-help
+- `tools/mcp-github/` (8111) — GitHub PR list/detail (mock data, GET + POST)
 
 **IdentityHub**
 - `identityhub/src/Purfle.IdentityHub.Core/` — agent registry, key revocation, trust attestations
@@ -417,8 +429,12 @@ purfle/
 - `AgentVersion.BundleBlobRef` tracks bundle location per version
 - **19 passing marketplace tests** (registry, attestation, publisher verification, bundle store)
 
-**Dogfood Agent (Phase 4)**
+**Dogfood Agents (Phase 4+5)**
 - `agents/file-assistant/` — reads, lists, searches, summarizes files in workspace
+- `agents/email-monitor/` — polls Gmail every 15 min, summarizes new emails (mcp-gmail on :8102)
+- `agents/pr-watcher/` — checks GitHub every 30 min for new PRs (mcp-github on :8111)
+- `agents/report-builder/` — runs at 07:00 daily, reads other agents' output, writes morning report
+- `agents/DOGFOOD.md` — setup guide with credential requirements
 - `tools/mcp-file-server/` — MCP server providing file read/list/search tools
 
 **Documentation**
@@ -429,9 +445,12 @@ purfle/
 - `docs/ROADMAP.md` — phase-based roadmap
 
 ### What does NOT exist yet (priority order)
-1. Python agent implementations (Python not available on primary dev machine)
-2. Azure-backed bundle blob store (LocalFileBundleStore only for now)
-3. Bundle integrity hashing (SHA-256 of ZIP stored with version metadata)
+1. Dogfood agents need signing — manifests have empty signatures, need `purfle sign` before live registry verification
+2. Token usage tracking in adapters — RunLogEntry has token fields but adapters don't yet report actual usage from API responses
+3. Python agent implementations (Python not available on primary dev machine)
+4. Azure-backed bundle blob store (LocalFileBundleStore only for now)
+5. Bundle integrity hashing (SHA-256 of ZIP stored with version metadata)
+6. macOS notification support (Windows toast notifications implemented, macOS falls back to debug output)
 
 ---
 
