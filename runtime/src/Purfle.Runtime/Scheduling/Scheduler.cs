@@ -47,9 +47,9 @@ public sealed class Scheduler
     /// Creates an <see cref="AgentRunner"/> for <paramref name="manifest"/>,
     /// computes its initial <c>NextRun</c>, and adds it to <see cref="Runners"/>.
     /// </summary>
-    public void Register(AgentManifest manifest)
+    public void Register(AgentManifest manifest, string? promptsDirectory = null)
     {
-        var runner = new AgentRunner(manifest, _llmAdapter);
+        var runner = new AgentRunner(manifest, _llmAdapter, promptsDirectory);
 
         if (manifest.Schedule is { } sched)
         {

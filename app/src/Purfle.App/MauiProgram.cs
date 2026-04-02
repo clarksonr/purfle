@@ -37,9 +37,29 @@ public static class MauiProgram
 
             foreach (var file in Directory.EnumerateFiles(agentsDir, "*.agent.json"))
             {
-                try   { scheduler.Register(loader.Load(file)); }
+                try
+                {
+                    var promptsDir = Path.Combine(Path.GetDirectoryName(file)!, "prompts");
+                    var prompts = Directory.Exists(promptsDir) ? promptsDir : null;
+                    scheduler.Register(loader.Load(file), prompts);
+                }
                 catch (Exception ex)
                       { System.Diagnostics.Debug.WriteLine($"[Purfle] Skipping {file}: {ex.Message}"); }
+            }
+
+            // Also scan subdirectories for agent.manifest.json (installed agent bundles)
+            foreach (var dir in Directory.EnumerateDirectories(agentsDir))
+            {
+                var manifestPath = Path.Combine(dir, "agent.manifest.json");
+                if (!File.Exists(manifestPath)) continue;
+                try
+                {
+                    var promptsDir = Path.Combine(dir, "prompts");
+                    var prompts = Directory.Exists(promptsDir) ? promptsDir : null;
+                    scheduler.Register(loader.Load(manifestPath), prompts);
+                }
+                catch (Exception ex)
+                      { System.Diagnostics.Debug.WriteLine($"[Purfle] Skipping {dir}: {ex.Message}"); }
             }
 
             _ = scheduler.StartAsync();

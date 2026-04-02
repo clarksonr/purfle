@@ -31,10 +31,20 @@ public sealed class AgentRunner
     /// </summary>
     public string OutputPath { get; }
 
-    public AgentRunner(AgentManifest manifest, ILlmAdapter llmAdapter)
+    /// <summary>
+    /// Optional directory that may contain <c>system.md</c>.
+    /// When set, the system prompt is loaded from file instead of the default.
+    /// </summary>
+    public string? PromptsDirectory { get; }
+
+    /// <summary>Error message from the most recent failed run, if any.</summary>
+    public string? LastError { get; private set; }
+
+    public AgentRunner(AgentManifest manifest, ILlmAdapter llmAdapter, string? promptsDirectory = null)
     {
         Manifest    = manifest;
         _llmAdapter = llmAdapter;
+        PromptsDirectory = promptsDirectory;
         OutputPath  = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "aivm", "output", manifest.Id.ToString());
@@ -47,11 +57,12 @@ public sealed class AgentRunner
     /// </summary>
     public async Task RunOnceAsync(CancellationToken ct = default)
     {
-        Status = AgentStatus.Running;
-        var now = DateTime.UtcNow;
+        Status    = AgentStatus.Running;
+        LastError = null;
+        var now   = DateTime.UtcNow;
         try
         {
-            var systemPrompt = BuildDefaultSystemPrompt();
+            var systemPrompt = await LoadSystemPromptAsync(ct);
             var userMessage  = $"You have been triggered at {now:O}. Perform your task.";
             var response     = await _llmAdapter.CompleteAsync(systemPrompt, userMessage, ct);
 
@@ -61,8 +72,9 @@ public sealed class AgentRunner
         }
         catch (Exception ex)
         {
-            Status = AgentStatus.Error;
-            try { await WriteLogAsync(now, $"ERROR: {ex.Message}", ct); }
+            Status    = AgentStatus.Error;
+            LastError = ex.Message;
+            try { await WriteLogAsync(now, $"ERROR: {ex.Message}\n{ex.StackTrace}", ct); }
             catch { /* best-effort: don't cascade a write failure */ }
         }
     }
@@ -76,8 +88,16 @@ public sealed class AgentRunner
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private string BuildDefaultSystemPrompt()
-        => $"You are {Manifest.Name}. {Manifest.Description ?? string.Empty}".TrimEnd();
+    private async Task<string> LoadSystemPromptAsync(CancellationToken ct)
+    {
+        if (PromptsDirectory is not null)
+        {
+            var path = Path.Combine(PromptsDirectory, "system.md");
+            if (File.Exists(path))
+                return await File.ReadAllTextAsync(path, ct);
+        }
+        return $"You are {Manifest.Name}. {Manifest.Description ?? string.Empty}".TrimEnd();
+    }
 
     private async Task WriteLogAsync(DateTime timestamp, string content, CancellationToken ct)
     {
