@@ -79,6 +79,14 @@ public sealed class AgentSandbox
         return env.Allow.Contains(name, StringComparer.Ordinal);
     }
 
+    /// <summary>Returns a human-readable summary of allowed write paths.</summary>
+    public string GetWritePathsSummary()
+    {
+        var fs = _permissions.Filesystem;
+        if (fs is null || fs.Write.Count == 0) return "(none)";
+        return string.Join(", ", fs.Write);
+    }
+
     /// <summary>Returns true if the agent may invoke MCP tool <paramref name="toolId"/>.</summary>
     public bool CanUseMcpTool(string toolId)
     {

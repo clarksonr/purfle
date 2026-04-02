@@ -180,10 +180,22 @@ public sealed class BuiltInToolExecutor
     private string ExecuteWriteFile(string path, string content)
     {
         if (string.IsNullOrWhiteSpace(path)) return "Error: path must not be empty.";
-        if (!_sandbox.CanWritePath(path))    return $"Error: permission denied — '{path}' not in filesystem.write allowlist.";
-        var dir = Path.GetDirectoryName(path);
+
+        // Resolve to absolute path to catch relative traversal (../../etc)
+        var resolvedPath = Path.GetFullPath(path);
+
+        if (!_sandbox.CanWritePath(resolvedPath))
+        {
+            Console.Error.WriteLine(
+                $"[Sandbox] BLOCKED out-of-bounds write: requested='{path}', " +
+                $"resolved='{resolvedPath}', allowed={_sandbox.GetWritePathsSummary()}");
+            return $"Error: permission denied — write to '{resolvedPath}' blocked. " +
+                   $"Path is outside the sandbox write allowlist ({_sandbox.GetWritePathsSummary()}).";
+        }
+
+        var dir = Path.GetDirectoryName(resolvedPath);
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        File.WriteAllText(path, content);
+        File.WriteAllText(resolvedPath, content);
         return "OK";
     }
 
