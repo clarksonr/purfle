@@ -241,7 +241,8 @@ purfle/
 │   │   ├── Purfle.Runtime.Ollama/
 │   │   └── Purfle.Runtime.Host/  ← runnable demo with live registry
 │   ├── tests/
-│   │   └── Purfle.Runtime.Tests/  ← 17 test files, 82+ passing tests
+│   │   ├── Purfle.Runtime.Tests/  ← 21 test files, 117 passing tests
+│   │   └── Purfle.TestAgents.Hello/ ← real agent DLL for assembly load tests
 │   └── Purfle.Runtime.sln
 ├── agents/                      ← example agent packages
 │   ├── chat.agent.json
@@ -320,8 +321,10 @@ purfle/
 - `Platform/` — ICredentialStore, CredentialStoreFactory, Windows/macOS/Linux/InMemory stores
 - `Scheduler` — drives AgentRunner on timer using schedule.interval_minutes
 - `AgentRunner` — loads prompts/system.md, calls ILlmAdapter.CompleteAsync, appends to run.log
-- `Assembly/` — AssemblyLoadContext wiring (exists, untested with real DLL)
-- **98+ passing tests** (20 test files, 16 new IPC/credential tests, 4 live AI tests skip without API keys)
+- `Assembly/` — AgentAssemblyLoadContext (collectible, isolated per agent, Purfle.Sdk shared via default ALC)
+- `Mcp/` — IMcpClient, McpClient (stdio JSON-RPC 2.0, raw BaseStream writes for Windows pipe compat)
+- `Purfle.TestAgents.Hello` — test agent DLL with HelloAgent (IAgent) + GreetTool (IAgentTool)
+- **117 passing tests** (21 test files, 9 assembly load tests, 10 IPC/MCP tests incl. 4 live mcp-file-server integration, 4 live AI tests skip without API keys)
 
 **Key Registry (Phase 2 — Complete)**
 - `registry/src/Purfle.KeyRegistry` — Azure Functions (GET/POST/DELETE `/keys/{id}`)
@@ -418,11 +421,9 @@ purfle/
 - `docs/ROADMAP.md` — phase-based roadmap
 
 ### What does NOT exist yet (priority order)
-1. Agent assembly (`agent.dll`) loading end-to-end — AssemblyLoadContext wiring exists but untested with a real DLL
-2. Full Ajv JSON Schema validation in `@purfle/core`
-3. Agent bundle hosting — signed `.purfle` ZIP upload and retrieval
-4. Python agent implementations (Python not available on primary dev machine)
-5. MCP server integration with ProcessAgentRunner tool dispatch
+1. Full Ajv JSON Schema validation in `@purfle/core`
+2. Agent bundle hosting — signed `.purfle` ZIP upload and retrieval
+3. Python agent implementations (Python not available on primary dev machine)
 
 ---
 

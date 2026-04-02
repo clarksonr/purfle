@@ -9,6 +9,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Purfle.Runtime.Tests/Purfle.Runtime.Tests.csproj" />
+    <Project Path="tests/Purfle.TestAgents.Hello/Purfle.TestAgents.Hello.csproj" />
   </Folder>
   <Project Path="../sdk/dotnet/Purfle.Sdk/Purfle.Sdk.csproj" />
 </Solution>

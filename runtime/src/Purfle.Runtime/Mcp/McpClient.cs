@@ -34,7 +34,6 @@ public sealed class McpClient : IMcpClient
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
-            StandardInputEncoding = Encoding.UTF8,
             StandardOutputEncoding = Encoding.UTF8,
         };
 
@@ -50,7 +49,16 @@ public sealed class McpClient : IMcpClient
     {
         await EnsureInitializedAsync(ct);
 
-        var response = await SendRequestAsync("tools/list", JsonDocument.Parse("{}").RootElement, ct);
+        await _lock.WaitAsync(ct);
+        JsonElement response;
+        try
+        {
+            response = await SendRequestCoreAsync("tools/list", JsonDocument.Parse("{}").RootElement, ct);
+        }
+        finally
+        {
+            _lock.Release();
+        }
 
         var tools = new List<McpToolInfo>();
         if (response.TryGetProperty("tools", out var toolsArray))
@@ -84,7 +92,16 @@ public sealed class McpClient : IMcpClient
             arguments = args,
         })).RootElement;
 
-        var response = await SendRequestAsync("tools/call", callParams, ct);
+        await _lock.WaitAsync(ct);
+        JsonElement response;
+        try
+        {
+            response = await SendRequestCoreAsync("tools/call", callParams, ct);
+        }
+        finally
+        {
+            _lock.Release();
+        }
 
         // MCP tool results have a "content" array; extract text entries.
         if (response.TryGetProperty("content", out var content))
@@ -123,7 +140,7 @@ public sealed class McpClient : IMcpClient
                 clientInfo = new { name = "purfle-runtime", version = "0.1.0" },
             })).RootElement;
 
-            await SendRequestAsync("initialize", initParams, ct);
+            await SendRequestCoreAsync("initialize", initParams, ct);
 
             // Send initialized notification (no response expected).
             await SendNotificationAsync("notifications/initialized", ct);
@@ -137,63 +154,54 @@ public sealed class McpClient : IMcpClient
     }
 
     /// <summary>
-    /// Sends a JSON-RPC request and reads the response.
+    /// Sends a JSON-RPC request and reads the response. Caller must hold <see cref="_lock"/>.
     /// </summary>
-    private async Task<JsonElement> SendRequestAsync(string method, JsonElement @params, CancellationToken ct)
+    private async Task<JsonElement> SendRequestCoreAsync(string method, JsonElement @params, CancellationToken ct)
     {
-        await _lock.WaitAsync(ct);
-        try
+        var id = _nextId++;
+        var request = JsonSerializer.Serialize(new
         {
-            var id = _nextId++;
-            var request = JsonSerializer.Serialize(new
+            jsonrpc = "2.0",
+            id,
+            method,
+            @params,
+        });
+
+        await WriteLineToStdinAsync(request, ct);
+
+        // Read lines until we get a JSON-RPC response with our id.
+        while (true)
+        {
+            var line = await ReadLineAsync(ct);
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            try
             {
-                jsonrpc = "2.0",
-                id,
-                method,
-                @params,
-            });
+                using var doc = JsonDocument.Parse(line);
+                var root = doc.RootElement;
 
-            await _process.StandardInput.WriteLineAsync(request.AsMemory(), ct);
-            await _process.StandardInput.FlushAsync();
+                // Skip notifications (no id field).
+                if (!root.TryGetProperty("id", out var responseId)) continue;
 
-            // Read lines until we get a JSON-RPC response with our id.
-            while (true)
-            {
-                var line = await ReadLineAsync(ct);
-                if (string.IsNullOrWhiteSpace(line)) continue;
-
-                try
+                if (responseId.ValueKind == JsonValueKind.Number && responseId.GetInt32() == id)
                 {
-                    using var doc = JsonDocument.Parse(line);
-                    var root = doc.RootElement;
-
-                    // Skip notifications (no id field).
-                    if (!root.TryGetProperty("id", out var responseId)) continue;
-
-                    if (responseId.ValueKind == JsonValueKind.Number && responseId.GetInt32() == id)
+                    if (root.TryGetProperty("error", out var error))
                     {
-                        if (root.TryGetProperty("error", out var error))
-                        {
-                            var message = error.TryGetProperty("message", out var msg)
-                                ? msg.GetString() : "Unknown MCP error";
-                            throw new InvalidOperationException($"MCP error: {message}");
-                        }
-
-                        // Clone the result so it survives doc disposal.
-                        return root.TryGetProperty("result", out var result)
-                            ? result.Clone()
-                            : JsonDocument.Parse("{}").RootElement;
+                        var message = error.TryGetProperty("message", out var msg)
+                            ? msg.GetString() : "Unknown MCP error";
+                        throw new InvalidOperationException($"MCP error: {message}");
                     }
-                }
-                catch (JsonException)
-                {
-                    // Not valid JSON — skip (could be server stderr leaking).
+
+                    // Clone the result so it survives doc disposal.
+                    return root.TryGetProperty("result", out var result)
+                        ? result.Clone()
+                        : JsonDocument.Parse("{}").RootElement;
                 }
             }
-        }
-        finally
-        {
-            _lock.Release();
+            catch (JsonException)
+            {
+                // Not valid JSON — skip (could be server stderr leaking).
+            }
         }
     }
 
@@ -209,8 +217,18 @@ public sealed class McpClient : IMcpClient
             @params = new { },
         });
 
-        await _process.StandardInput.WriteLineAsync(notification.AsMemory(), ct);
-        await _process.StandardInput.FlushAsync();
+        await WriteLineToStdinAsync(notification, ct);
+    }
+
+    /// <summary>
+    /// Writes a line to stdin as raw UTF-8 bytes, bypassing <see cref="StreamWriter"/>
+    /// buffering that can stall on Windows pipes.
+    /// </summary>
+    private async Task WriteLineToStdinAsync(string line, CancellationToken ct)
+    {
+        var bytes = Encoding.UTF8.GetBytes(line + "\n");
+        await _process.StandardInput.BaseStream.WriteAsync(bytes, ct);
+        await _process.StandardInput.BaseStream.FlushAsync(ct);
     }
 
     /// <summary>

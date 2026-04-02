@@ -23,7 +23,24 @@
     <ProjectReference Include="..\..\src\Purfle.Runtime\Purfle.Runtime.csproj" />
     <ProjectReference Include="..\..\src\Purfle.Runtime.Anthropic\Purfle.Runtime.Anthropic.csproj" />
     <ProjectReference Include="..\..\src\Purfle.Runtime.Gemini\Purfle.Runtime.Gemini.csproj" />
+    <!-- Build the test agent so its agent.dll is available for assembly load tests.
+         ReferenceOutputAssembly=false: we don't want a compile-time reference (we load it dynamically). -->
+    <ProjectReference Include="..\Purfle.TestAgents.Hello\Purfle.TestAgents.Hello.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
+
+  <!-- Copy the built HelloAgent agent.dll into a subdirectory of our output so
+       assembly load tests can point AgentLoader at it. -->
+  <Target Name="CopyTestAgentDll" AfterTargets="Build">
+    <PropertyGroup>
+      <_HelloAgentDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\Purfle.TestAgents.Hello\bin\$(Configuration)\$(TargetFramework)'))</_HelloAgentDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(OutputPath)test-agents\hello\" />
+    <Copy SourceFiles="$(_HelloAgentDir)\agent.dll;$(_HelloAgentDir)\agent.pdb"
+          DestinationFolder="$(OutputPath)test-agents\hello\"
+          SkipUnchangedFiles="true" />
+  </Target>
 
   <ItemGroup>
     <!-- Integration test base fixture: the canonical hello-world manifest from the spec -->
