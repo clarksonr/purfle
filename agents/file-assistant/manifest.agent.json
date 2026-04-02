@@ -1,0 +1,72 @@
+{
+  "purfle": "0.1",
+  "id": "dddddddd-dddd-4ddd-dddd-dddddddddddd",
+  "name": "File Assistant",
+  "version": "1.0.0",
+  "description": "Reads, summarizes, and searches local files in the workspace directory.",
+  "identity": {
+    "author": "Roman Noble",
+    "email": "roman@purfle.dev",
+    "key_id": "purfle-samples-key",
+    "algorithm": "ES256",
+    "issued_at": "2026-04-01T00:00:00Z",
+    "expires_at": "2027-04-01T00:00:00Z",
+    "signature": "placeholder-will-be-signed"
+  },
+  "capabilities": ["llm.chat", "fs.read", "mcp.tool"],
+  "permissions": {
+    "fs.read": {
+      "paths": ["./workspace"]
+    }
+  },
+  "schedule": {
+    "trigger": "startup"
+  },
+  "lifecycle": {
+    "on_error": "terminate"
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "gemini",
+    "model": "gemini-2.5-flash"
+  },
+  "tools": [
+    {
+      "name": "read_file",
+      "server": "http://localhost:8100",
+      "description": "Read the contents of a file"
+    },
+    {
+      "name": "list_directory",
+      "server": "http://localhost:8100",
+      "description": "List files in a directory"
+    },
+    {
+      "name": "search_files",
+      "server": "http://localhost:8100",
+      "description": "Search for files by name pattern"
+    }
+  ],
+  "io": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "The user's request about files."
+        }
+      },
+      "required": ["message"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "response": {
+          "type": "string",
+          "description": "The agent's reply."
+        }
+      },
+      "required": ["response"]
+    }
+  }
+}

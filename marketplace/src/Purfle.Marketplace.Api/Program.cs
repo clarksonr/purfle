@@ -17,6 +17,10 @@ builder.Services.AddJsonStorage(builder.Configuration);
 // Key registry — bridges the signing key repository to the runtime identity verifier.
 builder.Services.AddScoped<IKeyRegistry, DbKeyRegistry>();
 
+// Marketplace services
+builder.Services.AddScoped<PublisherVerificationService>();
+builder.Services.AddScoped<AttestationService>();
+
 // ASP.NET Identity — user/role stores already registered by AddJsonStorage.
 builder.Services.AddIdentity<Publisher, IdentityRole>(options =>
 {

@@ -11,6 +11,9 @@ public sealed class Publisher
     public required string DisplayName { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public bool IsVerified { get; set; }
+    public string? Domain { get; set; }
+    public string? VerificationChallenge { get; set; }
+    public DateTimeOffset? VerifiedAt { get; set; }
     public string? SecurityStamp { get; set; }
     public string? ConcurrencyStamp { get; set; } = Guid.NewGuid().ToString();
 }

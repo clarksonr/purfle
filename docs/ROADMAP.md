@@ -92,22 +92,42 @@
 
 **Goal:** Signed agents are discoverable, installable, and runnable. Publishers can manage their keys and listings.
 
-### Scaffolded (exists, not fully wired)
-- [x] `Purfle.Marketplace.Api` — ASP.NET Core with Agents, Auth, Keys controllers
-- [x] `Purfle.Marketplace.Core` — AgentListing, AgentVersion, Publisher, SigningKey entities
-- [x] Repository interfaces — IAgentListingRepository, AgentSearchPage
-- [x] DbKeyRegistry service
-- [x] OAuth PKCE login page
+### Marketplace API
+- [x] `Purfle.Marketplace.Api` — ASP.NET Core with Agents, Auth, Keys, Publishers, Attestations controllers
+- [x] `Purfle.Marketplace.Core` — AgentListing, AgentVersion, Publisher, SigningKey, Attestation entities
+- [x] Repository interfaces — all entities with JSON file-backed implementations
+- [x] `Purfle.Marketplace.Storage.Json` — JSON file storage (no database), Azure Blob option for manifests
+- [x] DbKeyRegistry service — bridges signing keys to runtime identity verifier
+- [x] OAuth PKCE login page + token endpoints
+
+### Publisher Verification
+- [x] Publisher registration with domain claim
+- [x] Domain verification via `.well-known/purfle-verify.txt`
+- [x] Verified status persisted and checked on attestation issuance
+
+### Attestation Service
+- [x] `marketplace-listed` — auto-issued on publish
+- [x] `publisher-verified` — auto-issued when publisher is domain-verified
+- [x] Attestation query endpoint — `GET /api/attestations/{agentId}`
+- [x] Duplicate attestation prevention
+
+### CLI Integration
+- [x] `purfle publish` — uploads signed manifest to marketplace API
+- [x] `purfle search` — queries marketplace with pagination
+- [x] `purfle install` — downloads and stores agent locally
+
+### Dogfood Agent
+- [x] `agents/file-assistant/` — reads, lists, searches, summarizes files
+- [x] `tools/mcp-file-server/` — MCP server providing file tools for agents
+
+### Tests
+- [x] 13 marketplace tests — registry, attestation, publisher verification
+- [x] All 49 SDK tests pass (13 CLI + 36 core)
 
 ### Remaining
-- [ ] Wire CLI `publish` → marketplace API (upload signed manifest + bundle)
-- [ ] Wire CLI `search` → marketplace API (query, paginate)
-- [ ] Wire CLI `install` → marketplace API (download + verify + install)
 - [ ] Publisher accounts — key management UI
-- [ ] Version history — list all versions of an agent
-- [ ] Storage backend — Azure Blob or file-based (no database per project decision)
-- [ ] Agent bundle hosting — signed `.purfle` ZIP storage and retrieval
-- [ ] Search indexing — full-text search over agent names and descriptions
+- [ ] Agent bundle hosting — signed `.purfle` ZIP upload and retrieval
+- [ ] Search ranking — relevance-based ordering
 
 ---
 

@@ -248,6 +248,7 @@ purfle/
 │   ├── file-search.agent.json
 │   ├── file-summarizer.agent.json
 │   ├── web-research.agent.json
+│   ├── file-assistant/           ← dogfood agent (read, list, search, summarize files)
 │   └── src/
 │       ├── Purfle.Agents.Chat/
 │       ├── Purfle.Agents.FileSearch/
@@ -263,10 +264,16 @@ purfle/
 │           ├── Controls/         ← AgentCard
 │           ├── ViewModels/       ← MainViewModel, AgentCardViewModel
 │           └── Services/         ← AgentStore, AgentExecutorService, AppAdapterFactory, MarketplaceService
+├── tools/
+│   └── mcp-file-server/             ← MCP server for file tools (read, list, search)
 ├── marketplace/
-│   └── src/
-│       ├── Purfle.Marketplace.Api/  ← ASP.NET Core (Agents, Auth, Keys controllers)
-│       └── Purfle.Marketplace.Core/ ← entities, repositories
+│   ├── src/
+│   │   ├── Purfle.Marketplace.Api/  ← ASP.NET Core (Agents, Auth, Keys, Publishers, Attestations)
+│   │   ├── Purfle.Marketplace.Core/ ← entities, repositories
+│   │   ├── Purfle.Marketplace.Shared/ ← DTOs
+│   │   └── Purfle.Marketplace.Storage.Json/ ← JSON file-backed storage
+│   └── tests/
+│       └── Purfle.Marketplace.Tests/ ← 13 tests (registry, attestation, verification)
 ├── sdk/
 │   ├── packages/
 │   │   ├── cli/src/commands/     ← init, build, sign, simulate, publish, search, install, login
@@ -276,6 +283,7 @@ purfle/
 └── docs/
     ├── GETTING_STARTED.md
     ├── MANIFEST_REFERENCE.md
+    ├── PUBLISHING.md
     ├── TROUBLESHOOTING.md
     └── ROADMAP.md
 ```
@@ -345,24 +353,34 @@ purfle/
 - `agents/file-summarizer.agent.json` — file summarization agent
 - `agents/web-research.agent.json` + `Purfle.Agents.WebResearch` — web research with link extraction
 
-**Marketplace (Phase 4 — Scaffolded)**
-- `Purfle.Marketplace.Api` — ASP.NET Core with Agents, Auth, Keys controllers
-- `Purfle.Marketplace.Core` — AgentListing, AgentVersion, Publisher, SigningKey entities
-- OAuth PKCE login page, DbKeyRegistry service
-- Not yet fully wired to CLI publish/search/install
+**Marketplace (Phase 4 — Complete)**
+- `Purfle.Marketplace.Api` — ASP.NET Core with Agents, Auth, Keys, Publishers, Attestations controllers
+- `Purfle.Marketplace.Core` — AgentListing, AgentVersion, Publisher, SigningKey, Attestation entities
+- `Purfle.Marketplace.Storage.Json` — JSON file-backed storage (no database), Azure Blob option
+- `Purfle.Marketplace.Shared` — DTOs for API communication
+- OAuth PKCE login + token endpoints
+- Publisher verification — domain verification via `.well-known/purfle-verify.txt`
+- Attestation service — auto-issues `marketplace-listed` and `publisher-verified` on publish
+- CLI commands fully wired: `publish`, `search`, `install`
+- **13 passing marketplace tests** (registry, attestation, publisher verification)
+
+**Dogfood Agent (Phase 4)**
+- `agents/file-assistant/` — reads, lists, searches, summarizes files in workspace
+- `tools/mcp-file-server/` — MCP server providing file read/list/search tools
 
 **Documentation**
 - `docs/GETTING_STARTED.md` — end-to-end walkthrough from install to publish
 - `docs/MANIFEST_REFERENCE.md` — field-by-field manifest reference aligned with schema
+- `docs/PUBLISHING.md` — publisher registration, domain verification, publishing workflow
 - `docs/TROUBLESHOOTING.md` — error messages, causes, and fixes for all LoadFailureReasons
 - `docs/ROADMAP.md` — phase-based roadmap
 
 ### What does NOT exist yet (priority order)
-1. Marketplace backend fully wired — CLI publish/search/install to marketplace API
-2. Agent assembly (`agent.dll`) loading end-to-end — AssemblyLoadContext wiring exists but untested with a real DLL
-3. Windows Credential Manager integration for API key storage
-4. CI/CD — GitHub Actions for build, test, schema validation
-5. Full Ajv JSON Schema validation in `@purfle/core`
+1. Agent assembly (`agent.dll`) loading end-to-end — AssemblyLoadContext wiring exists but untested with a real DLL
+2. Windows Credential Manager integration for API key storage
+3. CI/CD — GitHub Actions for build, test, schema validation
+4. Full Ajv JSON Schema validation in `@purfle/core`
+5. Agent bundle hosting — signed `.purfle` ZIP upload and retrieval
 
 ---
 

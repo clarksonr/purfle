@@ -1,0 +1,26 @@
+{
+  "project": "purfle",
+  "version": "0.1",
+  "agents": [
+    {
+      "id": "file-assistant",
+      "status": "active",
+      "lastRun": "2026-04-01T10:00:00Z"
+    },
+    {
+      "id": "chat",
+      "status": "active",
+      "lastRun": "2026-04-01T09:30:00Z"
+    },
+    {
+      "id": "web-research",
+      "status": "idle",
+      "lastRun": "2026-03-31T18:00:00Z"
+    }
+  ],
+  "stats": {
+    "totalRuns": 142,
+    "successRate": 0.97,
+    "avgDurationMs": 2300
+  }
+}

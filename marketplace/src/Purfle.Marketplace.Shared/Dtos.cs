@@ -51,6 +51,47 @@ public sealed record AgentVersionSummary(
     long Downloads
 );
 
+// --- Publisher Verification DTOs ---
+
+public sealed record RegisterPublisherRequest(
+    string DisplayName,
+    string Domain,
+    string Email,
+    string Password
+);
+
+public sealed record VerificationChallengeResponse(
+    string Challenge,
+    string Instructions
+);
+
+public sealed record VerifyDomainRequest(
+    string Domain
+);
+
+public sealed record PublisherDetailResponse(
+    string Id,
+    string DisplayName,
+    string? Domain,
+    bool IsVerified,
+    DateTimeOffset CreatedAt
+);
+
+// --- Attestation DTOs ---
+
+public sealed record AttestationResponse(
+    Guid Id,
+    string AgentId,
+    string Type,
+    string IssuedBy,
+    DateTimeOffset IssuedAt
+);
+
+public sealed record RequestAttestationRequest(
+    string AgentId,
+    string Type  // "publisher-verified" or "marketplace-listed"
+);
+
 // --- Auth DTOs ---
 
 public sealed record RegisterRequest(

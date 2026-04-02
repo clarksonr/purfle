@@ -19,10 +19,9 @@ public sealed class AgentsController(
     ISigningKeyRepository signingKeys,
     IPublisherRepository publishers,
     IManifestBlobStore blobStore,
-    IKeyRegistry keyRegistry) : ControllerBase
+    IKeyRegistry keyRegistry,
+    Services.AttestationService attestationService) : ControllerBase
 {
-    private static readonly ManifestLoader s_manifestLoader = new();
-
     /// <summary>
     /// Search/list agents.
     /// </summary>
@@ -134,11 +133,16 @@ public sealed class AgentsController(
             return BadRequest("Request body must contain a signed manifest JSON.");
 
         // Step 1-2: Parse and schema-validate.
-        var parseResult = s_manifestLoader.Load(manifestJson);
-        if (!parseResult.Success)
-            return BadRequest($"Manifest validation failed: {parseResult.FailureMessage}");
-
-        var manifest = parseResult.Manifest!;
+        AgentManifest manifest;
+        try
+        {
+            manifest = System.Text.Json.JsonSerializer.Deserialize<AgentManifest>(manifestJson)
+                ?? throw new ManifestParseException("Manifest JSON deserialized to null.");
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or ManifestParseException)
+        {
+            return BadRequest($"Manifest validation failed: {ex.Message}");
+        }
 
         // Step 3: Verify JWS signature.
         var verifier = new IdentityVerifier(keyRegistry);
@@ -153,7 +157,7 @@ public sealed class AgentsController(
             return BadRequest("The signing key does not belong to your account.");
 
         // Find or create the agent listing.
-        var listing = await agentListings.FindByAgentIdAsync(manifest.Id, ct);
+        var listing = await agentListings.FindByAgentIdAsync(manifest.Id.ToString(), ct);
 
         var now = DateTimeOffset.UtcNow;
 
@@ -162,9 +166,9 @@ public sealed class AgentsController(
             listing = new CoreEntities.AgentListing
             {
                 Id = Guid.NewGuid(),
-                AgentId = manifest.Id,
+                AgentId = manifest.Id.ToString(),
                 Name = manifest.Name,
-                Description = manifest.Description,
+                Description = manifest.Description ?? "",
                 CreatedAt = now,
                 UpdatedAt = now,
                 IsListed = true,
@@ -178,17 +182,17 @@ public sealed class AgentsController(
                 return Forbid();
 
             listing.Name = manifest.Name;
-            listing.Description = manifest.Description;
+            listing.Description = manifest.Description ?? "";
             listing.UpdatedAt = now;
             await agentListings.UpdateAsync(listing, ct);
         }
 
         // Check for duplicate version.
         if (await agentVersions.ExistsAsync(listing.Id, manifest.Version, ct))
-            return Conflict($"Version {manifest.Version} already exists for agent '{manifest.Id}'.");
+            return Conflict($"Version {manifest.Version} already exists for agent '{manifest.Id.ToString()}'.");
 
         // Store manifest in blob store.
-        var blobRef = await blobStore.StoreAsync(manifest.Id, manifest.Version, manifestJson, ct);
+        var blobRef = await blobStore.StoreAsync(manifest.Id.ToString(), manifest.Version, manifestJson, ct);
 
         var agentVersion = new CoreEntities.AgentVersion
         {
@@ -202,9 +206,14 @@ public sealed class AgentsController(
 
         await agentVersions.CreateAsync(agentVersion, ct);
 
-        return CreatedAtAction(nameof(GetDetail), new { agentId = manifest.Id }, new
+        // Auto-issue attestations
+        var publisher = await publishers.FindByIdAsync(publisherId, ct);
+        await attestationService.IssuePublishAttestationsAsync(
+            manifest.Id.ToString(), publisher?.IsVerified ?? false, ct);
+
+        return CreatedAtAction(nameof(GetDetail), new { agentId = manifest.Id.ToString() }, new
         {
-            agentId = manifest.Id,
+            agentId = manifest.Id.ToString(),
             version = manifest.Version,
             message = "Agent published successfully.",
         });

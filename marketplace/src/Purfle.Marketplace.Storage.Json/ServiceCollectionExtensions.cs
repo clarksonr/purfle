@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ISigningKeyRepository>(new JsonSigningKeyRepository(dataDirectory));
         services.AddSingleton<IAgentListingRepository>(new JsonAgentListingRepository(dataDirectory));
         services.AddSingleton<IAgentVersionRepository>(new JsonAgentVersionRepository(dataDirectory));
+        services.AddSingleton<IAttestationRepository>(new JsonAttestationRepository(dataDirectory));
 
         // Blob store
         if (manifestStore == "Azure")
