@@ -228,7 +228,12 @@ public sealed class GeminiAdapter : IInferenceAdapter
             if (!_sandbox.CanUseMcpTool(toolName))
                 return $"Error: permission denied — MCP tool '{toolName}' is not in the agent's tools.mcp allowlist.";
             try   { return await mcpClient.CallToolAsync(toolName, args?.GetRawText() ?? "{}", ct); }
-            catch (Exception ex) { return $"Error: MCP tool '{toolName}' failed — {ex.Message}"; }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    $"[GeminiAdapter] MCP tool '{toolName}' call failed (server may have dropped): {ex.Message}");
+                return $"Error: MCP tool '{toolName}' failed — {ex.Message}. The MCP server may be unreachable.";
+            }
         }
 
         return $"Error: unknown tool '{toolName}'.";

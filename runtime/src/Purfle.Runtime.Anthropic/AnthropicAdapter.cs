@@ -355,7 +355,12 @@ public sealed class AnthropicAdapter : IInferenceAdapter, ILlmAdapter
             if (!_sandbox.CanUseMcpTool(toolName))
                 return $"Error: permission denied — MCP tool '{toolName}' is not in the agent's tools.mcp allowlist.";
             try   { return await mcpClient.CallToolAsync(toolName, input?.GetRawText() ?? "{}", ct); }
-            catch (Exception ex) { return $"Error: MCP tool '{toolName}' failed — {ex.Message}"; }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    $"[AnthropicAdapter] MCP tool '{toolName}' call failed (server may have dropped): {ex.Message}");
+                return $"Error: MCP tool '{toolName}' failed — {ex.Message}. The MCP server may be unreachable.";
+            }
         }
 
         return $"Error: unknown tool '{toolName}'.";
