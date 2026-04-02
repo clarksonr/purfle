@@ -19,6 +19,12 @@ namespace Purfle.Runtime.Scheduling;
 /// catches and logs per-loop errors so that a single bad runner can never crash
 /// the host.
 /// </para>
+///
+/// <para>
+/// Background execution: <see cref="PeriodicTimer"/> and <see cref="Task.Delay"/>
+/// continue running when the MAUI app is backgrounded or the screen is locked.
+/// The scheduler does not depend on UI thread activity.
+/// </para>
 /// </summary>
 public sealed class Scheduler
 {
