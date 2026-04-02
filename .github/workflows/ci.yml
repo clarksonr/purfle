@@ -1,0 +1,182 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  NODE_VERSION: "24"
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  runtime-build:
+    name: Runtime (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-runtime-${{ hashFiles('runtime/**/*.csproj') }}
+          restore-keys: nuget-runtime-
+
+      - name: Restore
+        run: dotnet restore runtime/Purfle.Runtime.slnx
+
+      - name: Build
+        run: dotnet build runtime/Purfle.Runtime.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test runtime/Purfle.Runtime.slnx --no-build --configuration Release --verbosity normal
+
+  sdk-build:
+    name: SDK (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: sdk/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: sdk
+
+      - name: Build
+        run: npm run build
+        working-directory: sdk
+
+      - name: Test
+        run: npm test
+        working-directory: sdk
+
+  dashboard-build:
+    name: Dashboard API (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-dashboard-${{ hashFiles('dashboard/**/*.csproj') }}
+          restore-keys: nuget-dashboard-
+
+      - name: Build
+        run: dotnet build dashboard/src/Purfle.Dashboard.Api/Purfle.Dashboard.Api.csproj --configuration Release
+
+  identityhub-build:
+    name: IdentityHub (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-identityhub-${{ hashFiles('identityhub/**/*.csproj') }}
+          restore-keys: nuget-identityhub-
+
+      - name: Build API
+        run: dotnet build identityhub/src/Purfle.IdentityHub.Api/Purfle.IdentityHub.Api.csproj --configuration Release
+
+      - name: Build Core
+        run: dotnet build identityhub/src/Purfle.IdentityHub.Core/Purfle.IdentityHub.Core.csproj --configuration Release
+
+  agents-build:
+    name: Agents C# (build)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        agent:
+          - agents/api-guardian/csharp
+          - agents/cli-generator/csharp
+          - agents/code-reviewer/csharp
+          - agents/db-assistant/csharp
+          - agents/email-priority/csharp
+          - agents/file-assistant/csharp
+          - agents/meeting-assistant/csharp
+          - agents/news-digest/csharp
+          - agents/purfle-pet/csharp
+          - agents/research-assistant/csharp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-agents-${{ hashFiles(format('{0}/*.csproj', matrix.agent)) }}
+          restore-keys: nuget-agents-
+
+      - name: Build
+        run: dotnet build ${{ matrix.agent }}/*.csproj --configuration Release
+
+  mcp-servers-build:
+    name: MCP servers (build)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        server:
+          - tools/mcp-api-tools
+          - tools/mcp-cli-gen
+          - tools/mcp-code-tools
+          - tools/mcp-db-tools
+          - tools/mcp-file-server
+          - tools/mcp-gmail
+          - tools/mcp-meeting
+          - tools/mcp-microsoft-email
+          - tools/mcp-news
+          - tools/mcp-pet
+          - tools/mcp-research
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.server }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ${{ matrix.server }}
+
+      - name: Build
+        run: npm run build
+        working-directory: ${{ matrix.server }}

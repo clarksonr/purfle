@@ -1,0 +1,189 @@
+version: 2
+
+updates:
+  # Runtime (.NET)
+  - package-ecosystem: nuget
+    directory: /runtime
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - dotnet
+
+  # Dashboard (.NET)
+  - package-ecosystem: nuget
+    directory: /dashboard
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - dotnet
+
+  # IdentityHub (.NET)
+  - package-ecosystem: nuget
+    directory: /identityhub
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - dotnet
+
+  # Marketplace (.NET)
+  - package-ecosystem: nuget
+    directory: /marketplace
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - dotnet
+
+  # SDK (npm)
+  - package-ecosystem: npm
+    directory: /sdk
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - npm
+
+  # MCP file-server (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-file-server
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP api-tools (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-api-tools
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP cli-gen (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-cli-gen
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP code-tools (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-code-tools
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP db-tools (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-db-tools
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP gmail (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-gmail
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP meeting (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-meeting
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP microsoft-email (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-microsoft-email
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP news (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-news
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP pet (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-pet
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # MCP research (npm)
+  - package-ecosystem: npm
+    directory: /tools/mcp-research
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - npm
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci

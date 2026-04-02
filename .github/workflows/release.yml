@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  DOTNET_VERSION: "10.0.x"
+  NODE_VERSION: "24"
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-runtime:
+    name: Build Runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-runtime-${{ hashFiles('runtime/**/*.csproj') }}
+          restore-keys: nuget-runtime-
+
+      - name: Build
+        run: dotnet build runtime/Purfle.Runtime.slnx --configuration Release
+
+      - name: Test
+        run: dotnet test runtime/Purfle.Runtime.slnx --configuration Release --verbosity normal
+
+      - name: Publish
+        run: dotnet publish runtime/src/Purfle.Runtime.Host/Purfle.Runtime.Host.csproj --configuration Release --output ./artifacts/runtime
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime
+          path: ./artifacts/runtime
+
+  build-sdk:
+    name: Build SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: sdk/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: sdk
+
+      - name: Build
+        run: npm run build
+        working-directory: sdk
+
+      - name: Test
+        run: npm test
+        working-directory: sdk
+
+      - name: Pack CLI
+        run: npm pack
+        working-directory: sdk/packages/cli
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-cli
+          path: sdk/packages/cli/*.tgz
+
+  build-dashboard:
+    name: Build Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-dashboard-${{ hashFiles('dashboard/**/*.csproj') }}
+          restore-keys: nuget-dashboard-
+
+      - name: Publish
+        run: dotnet publish dashboard/src/Purfle.Dashboard.Api/Purfle.Dashboard.Api.csproj --configuration Release --output ./artifacts/dashboard
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard
+          path: ./artifacts/dashboard
+
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-runtime, build-sdk, build-dashboard]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Archive runtime
+        run: tar -czf runtime-${{ github.ref_name }}.tar.gz -C artifacts/runtime .
+
+      - name: Archive dashboard
+        run: tar -czf dashboard-${{ github.ref_name }}.tar.gz -C artifacts/dashboard .
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          TAG=${{ github.ref_name }}
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${TAG}$" | head -1)
+          if [ -n "$PREV_TAG" ]; then
+            echo "## Changes since ${PREV_TAG}" > release-notes.md
+            echo "" >> release-notes.md
+            git log ${PREV_TAG}..${TAG} --pretty=format:"- %s (%h)" >> release-notes.md
+          else
+            echo "## Initial Release" > release-notes.md
+            echo "" >> release-notes.md
+            git log --pretty=format:"- %s (%h)" -20 >> release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: |
+            runtime-${{ github.ref_name }}.tar.gz
+            dashboard-${{ github.ref_name }}.tar.gz
+            artifacts/sdk-cli/*.tgz

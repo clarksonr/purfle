@@ -131,6 +131,121 @@
 
 ---
 
+## Phase A — IPC Protocol + Inference Adapters + Credential Stores
+
+**Goal:** Runtime infrastructure for inter-process communication, pluggable inference, and secure credential storage.
+
+- [x] IPC protocol for agent-runtime communication
+- [x] Inference adapter abstraction with pluggable backends
+- [x] Credential store abstraction (Windows Credential Manager / Mac Keychain path)
+
+**Status: Complete.**
+
+---
+
+## Phase B — IdentityHub
+
+**Goal:** Centralized identity management service for publisher keys and agent verification.
+
+- [x] `Purfle.IdentityHub.Api` — ASP.NET Core identity service
+- [x] `Purfle.IdentityHub.Core` — core entities and logic
+- [x] Key management endpoints
+- [x] Publisher identity verification
+
+**Status: Complete.**
+
+---
+
+## Phase C — Dashboard API
+
+**Goal:** Web API for monitoring agent status, run history, and system health.
+
+- [x] `Purfle.Dashboard.Api` — ASP.NET Core dashboard service
+- [x] Agent status and run history endpoints
+- [x] Log viewing endpoints
+
+**Status: Complete.**
+
+---
+
+## Phase D — Polyglot Agent Model
+
+**Goal:** Agents can be implemented in both C# and TypeScript, with dual implementations for every agent.
+
+- [x] C# agent implementation pattern (dotnet run)
+- [x] TypeScript agent implementation pattern (npm start)
+- [x] 10 agents with dual C#/TypeScript implementations
+
+**Status: Complete.**
+
+---
+
+## Phase E — MCP Tool Servers
+
+**Goal:** Dedicated MCP servers providing specialized tools for each agent domain.
+
+- [x] `mcp-api-tools` — API monitoring and testing tools
+- [x] `mcp-cli-gen` — CLI generation tools
+- [x] `mcp-code-tools` — Code review and analysis tools
+- [x] `mcp-db-tools` — Database query and schema tools
+- [x] `mcp-file-server` — File read/list/search tools
+- [x] `mcp-gmail` — Gmail integration tools
+- [x] `mcp-meeting` — Meeting management tools
+- [x] `mcp-microsoft-email` — Microsoft email integration tools
+- [x] `mcp-news` — News aggregation tools
+- [x] `mcp-pet` — Virtual pet tools
+- [x] `mcp-research` — Research and web search tools
+
+**Status: Complete.**
+
+---
+
+## Phase F — Agent Expansion
+
+**Goal:** A rich library of example agents covering common use cases.
+
+- [x] `api-guardian` — API uptime and change monitoring
+- [x] `cli-generator` — Natural language to CLI tools
+- [x] `code-reviewer` — Automated code review
+- [x] `db-assistant` — Database exploration and queries
+- [x] `email-priority` — Email prioritization and summarization
+- [x] `file-assistant` — File operations and summarization
+- [x] `meeting-assistant` — Meeting agendas and notes
+- [x] `news-digest` — Daily news curation
+- [x] `purfle-pet` — Virtual pet demo agent
+- [x] `research-assistant` — Research compilation
+
+**Status: Complete.**
+
+---
+
+## Phase G — Gemini + Additional Adapters
+
+**Goal:** Multi-provider LLM support beyond Anthropic.
+
+- [x] `Purfle.Runtime.Gemini` — Google Gemini adapter
+- [x] AppAdapterFactory — engine picker based on manifest or user preference
+- [x] `Purfle.Runtime.OpenClaw` — stubbed
+- [x] `Purfle.Runtime.Ollama` — stubbed
+
+**Status: Complete. OpenClaw/Ollama adapters stubbed for future implementation.**
+
+---
+
+## Phase H — CI/CD + Documentation
+
+**Goal:** Automated builds, dependency monitoring, and updated documentation.
+
+- [x] `.github/workflows/ci.yml` — matrix build for runtime, SDK, dashboard, IdentityHub, agents, MCP servers
+- [x] `.github/workflows/release.yml` — tag-triggered release with artifacts
+- [x] `.github/dependabot.yml` — weekly NuGet and npm dependency monitoring
+- [x] Updated `docs/GETTING_STARTED.md` — polyglot agents, dashboard section
+- [x] Updated `docs/ROADMAP.md` — phases A-H marked complete
+
+**Status: Complete.**
+
+---
+
 ## Phase 5 — Production Hardening
 
 **Goal:** Ready for real-world use with monitoring, credentials, and device support.

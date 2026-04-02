@@ -420,6 +420,79 @@ Installed agents are saved to `~/.purfle/agents/<agent-id>/agent.json`.
 
 ---
 
+## Polyglot Agents
+
+Purfle agents can be implemented in both C# and TypeScript. Each agent in the `agents/` directory contains two implementations side by side:
+
+```
+agents/news-digest/
+  manifest.agent.json   # the signed manifest
+  prompts/
+    system.md           # LLM system prompt
+  csharp/               # C# implementation
+    NewsDigest.csproj
+    Program.cs
+  typescript/           # TypeScript implementation
+    package.json
+    src/index.ts
+```
+
+### Running a C# agent
+
+```bash
+cd agents/news-digest/csharp
+dotnet run
+```
+
+The C# implementation uses the Purfle runtime libraries directly. It builds with `dotnet build` and runs with `dotnet run`. Make sure the required API key is set in your environment before running.
+
+### Running a TypeScript agent
+
+```bash
+cd agents/news-digest/typescript
+npm install
+npm start
+```
+
+The TypeScript implementation connects to its corresponding MCP server for tool access. It builds with `npm run build` and runs with `npm start`.
+
+### Available agents
+
+| Agent | Description |
+|---|---|
+| `api-guardian` | Monitors API endpoints for uptime and changes |
+| `cli-generator` | Generates CLI tools from natural language specs |
+| `code-reviewer` | Reviews code changes and suggests improvements |
+| `db-assistant` | Helps with database queries and schema exploration |
+| `email-priority` | Prioritizes and summarizes email messages |
+| `file-assistant` | Reads, lists, searches, and summarizes files |
+| `meeting-assistant` | Prepares meeting agendas and summarizes notes |
+| `news-digest` | Curates daily news digests from configured sources |
+| `purfle-pet` | A virtual pet agent (fun demo) |
+| `research-assistant` | Conducts research and compiles findings |
+
+Each agent has a corresponding MCP server in `tools/` that provides its specialized tools (e.g., `tools/mcp-news/` for `news-digest`).
+
+---
+
+## Dashboard
+
+The Purfle Dashboard is an ASP.NET Core web API that provides a centralized view of all running agents, their status, and logs.
+
+### Running the dashboard
+
+```bash
+dotnet run --project dashboard/src/Purfle.Dashboard.Api
+```
+
+The dashboard API starts on `https://localhost:5001` by default. It exposes endpoints for:
+
+- Viewing all registered agents and their current status
+- Checking run history and logs
+- Monitoring agent health
+
+---
+
 ## Next Steps
 
 - Read the [Manifest Reference](MANIFEST_REFERENCE.md) for field-by-field documentation
