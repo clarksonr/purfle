@@ -25,7 +25,7 @@ namespace Purfle.Runtime.Gemini;
 ///   - <c>runtime.model</c> in the manifest selects the Gemini model.
 ///     Defaults to <c>gemini-2.5-flash</c> when not specified.
 /// </summary>
-public sealed class GeminiAdapter : IInferenceAdapter
+public sealed class GeminiAdapter : IInferenceAdapter, ILlmAdapter
 {
     private const string ApiEndpointBase = "https://generativelanguage.googleapis.com/v1beta/models";
     private const string EnvApiKey       = "GEMINI_API_KEY";
@@ -128,6 +128,21 @@ public sealed class GeminiAdapter : IInferenceAdapter
                     [.. s.Required])))
             .ToList();
         _tools = [.. builtinTools, .. mcpToolDefs, .. agentToolDefs];
+    }
+
+    /// <summary>Accumulated token usage from the most recent call.</summary>
+    private int _lastInputTokens;
+    private int _lastOutputTokens;
+
+    // ── ILlmAdapter ──────────────────────────────────────────────────────────────
+
+    async Task<LlmResult> ILlmAdapter.CompleteAsync(string systemPrompt, string userMessage,
+                                            CancellationToken ct)
+    {
+        _lastInputTokens = 0;
+        _lastOutputTokens = 0;
+        var text = await InvokeAsync(systemPrompt, userMessage, ct);
+        return new LlmResult(text, _lastInputTokens, _lastOutputTokens);
     }
 
     // ── Single-turn interface ────────────────────────────────────────────────
@@ -324,8 +339,16 @@ public sealed class GeminiAdapter : IInferenceAdapter
                     throw new InvalidOperationException($"Gemini API {(int)response.StatusCode}: {body}");
                 }
 
-                return await response.Content.ReadFromJsonAsync<GenerateContentResponse>(s_options, ct)
+                var result = await response.Content.ReadFromJsonAsync<GenerateContentResponse>(s_options, ct)
                     ?? throw new InvalidOperationException("Gemini API returned an empty response.");
+
+                if (result.UsageMetadata is { } usage)
+                {
+                    _lastInputTokens  += usage.PromptTokenCount;
+                    _lastOutputTokens += usage.CandidatesTokenCount;
+                }
+
+                return result;
             }
         }
 
@@ -367,7 +390,7 @@ public sealed class GeminiAdapter : IInferenceAdapter
 
     private sealed record FunctionResponseContent(string Result);
 
-    private sealed record GenerateContentResponse(List<Candidate> Candidates);
+    private sealed record GenerateContentResponse(List<Candidate> Candidates, UsageMetadata? UsageMetadata);
 
     private sealed record Candidate(Content Content, string? FinishReason);
 
@@ -384,4 +407,6 @@ public sealed class GeminiAdapter : IInferenceAdapter
         string[] Required);
 
     private sealed record ParameterProperty(string Type, string Description);
+
+    private sealed record UsageMetadata(int PromptTokenCount, int CandidatesTokenCount);
 }
