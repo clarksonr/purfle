@@ -105,7 +105,7 @@ public sealed class Scheduler
             switch (sched.Trigger)
             {
                 case "startup":
-                    await runner.RunOnceAsync(ct);
+                    await RunSafeAsync(runner, ct);
                     break;
 
                 case "interval":
@@ -114,8 +114,15 @@ public sealed class Scheduler
                     using var timer = new PeriodicTimer(period);
                     while (await timer.WaitForNextTickAsync(ct))
                     {
+                        // Skip overlapping runs — if agent is still running, skip this tick
+                        if (runner.Status == AgentStatus.Running)
+                        {
+                            Console.Error.WriteLine(
+                                $"[Scheduler] Skipping run for agent {runner.Manifest.Id} — previous run still in progress.");
+                            continue;
+                        }
                         runner.NextRun = DateTime.UtcNow.Add(period);
-                        await runner.RunOnceAsync(ct);
+                        await RunSafeAsync(runner, ct);
                     }
                     break;
                 }
@@ -130,9 +137,16 @@ public sealed class Scheduler
                         var delay = next - DateTime.UtcNow;
                         if (delay > TimeSpan.Zero)
                             await Task.Delay(delay, ct);
+                        // Skip if still running from previous cron trigger
+                        if (runner.Status == AgentStatus.Running)
+                        {
+                            Console.Error.WriteLine(
+                                $"[Scheduler] Skipping cron run for agent {runner.Manifest.Id} — previous run still in progress.");
+                            continue;
+                        }
                         runner.NextRun = crontab.GetNextOccurrence(DateTime.UtcNow);
                         if (!ct.IsCancellationRequested)
-                            await runner.RunOnceAsync(ct);
+                            await RunSafeAsync(runner, ct);
                     }
                     break;
                 }
@@ -143,6 +157,26 @@ public sealed class Scheduler
         {
             Console.Error.WriteLine(
                 $"[Scheduler] Loop error for agent {runner.Manifest.Id}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Runs an agent with crash isolation — any exception from the agent is caught
+    /// and logged so the scheduler loop continues to reschedule normally.
+    /// </summary>
+    private static async Task RunSafeAsync(AgentRunner runner, CancellationToken ct)
+    {
+        try
+        {
+            await runner.RunOnceAsync(ct);
+        }
+        catch (OperationCanceledException) { throw; } // propagate cancellation
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(
+                $"[Scheduler] Agent {runner.Manifest.Id} crashed during run: {ex.Message}\n{ex.StackTrace}");
+            // AgentRunner.RunOnceAsync already catches exceptions, but if something
+            // escapes (e.g. out of memory), we catch it here so the loop continues.
         }
     }
 
