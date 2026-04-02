@@ -19,7 +19,7 @@ namespace Purfle.Runtime.Ollama;
 /// <c>runtime.model</c> in the agent manifest.
 /// </para>
 /// </summary>
-public sealed class OllamaAdapter : IInferenceAdapter
+public sealed class OllamaAdapter : IInferenceAdapter, ILlmAdapter
 {
     private const string DefaultBaseUrl = "http://localhost:11434";
     private const string ChatEndpoint   = "/api/chat";
@@ -48,6 +48,21 @@ public sealed class OllamaAdapter : IInferenceAdapter
         _model   = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
         _baseUrl = (baseUrl ?? DefaultBaseUrl).TrimEnd('/');
         _http    = http ?? new HttpClient();
+    }
+
+    /// <summary>Token usage from the most recent call.</summary>
+    private int _lastInputTokens;
+    private int _lastOutputTokens;
+
+    // ── ILlmAdapter ──────────────────────────────────────────────────────────────
+
+    async Task<LlmResult> ILlmAdapter.CompleteAsync(string systemPrompt, string userMessage,
+                                            CancellationToken ct)
+    {
+        _lastInputTokens = 0;
+        _lastOutputTokens = 0;
+        var text = await InvokeAsync(systemPrompt, userMessage, ct);
+        return new LlmResult(text, _lastInputTokens, _lastOutputTokens);
     }
 
     // ── Single-turn ──────────────────────────────────────────────────────────
@@ -164,6 +179,9 @@ public sealed class OllamaAdapter : IInferenceAdapter
         if (string.IsNullOrEmpty(content))
             throw new LlmAdapterException("Ollama API returned a response with no content.");
 
+        _lastInputTokens  += result.PromptEvalCount ?? 0;
+        _lastOutputTokens += result.EvalCount ?? 0;
+
         return content;
     }
 
@@ -188,8 +206,9 @@ public sealed class OllamaAdapter : IInferenceAdapter
         [property: JsonPropertyName("stream")]   bool Stream);
 
     private sealed record OllamaChatResponse(
-        [property: JsonPropertyName("message")]    OllamaMessageResponse? Message,
-        [property: JsonPropertyName("eval_count")] int? EvalCount);
+        [property: JsonPropertyName("message")]           OllamaMessageResponse? Message,
+        [property: JsonPropertyName("prompt_eval_count")] int? PromptEvalCount,
+        [property: JsonPropertyName("eval_count")]        int? EvalCount);
 
     private sealed record OllamaMessageResponse(
         [property: JsonPropertyName("role")]    string? Role,
