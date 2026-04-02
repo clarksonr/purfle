@@ -13,6 +13,12 @@ export type CapabilityString =
   | "fs.write"
   | "mcp.tool";
 
+export interface ScheduleBlock {
+  trigger: "interval" | "cron" | "startup";
+  interval_minutes?: number;
+  cron?: string;
+}
+
 export interface AgentManifest {
   purfle: string;
   id: string;
@@ -22,6 +28,7 @@ export interface AgentManifest {
   identity: AgentIdentity;
   capabilities: CapabilityString[];
   permissions?: AgentPermissions;
+  schedule?: ScheduleBlock;
   lifecycle?: AgentLifecycle;
   runtime: AgentRuntime;
   tools?: ToolBinding[];

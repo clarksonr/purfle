@@ -212,6 +212,122 @@ describe("validateManifest", () => {
   });
 });
 
+// ─── Schedule validation tests ───────────────────────────────────────────────
+
+describe("schedule validation", () => {
+  it("accepts a valid interval schedule", () => {
+    const m = { ...validManifestObj(), schedule: { trigger: "interval", interval_minutes: 15 } };
+    const result = validateManifest(m);
+    assert.ok(result.valid, `errors: ${result.errors.join(", ")}`);
+  });
+
+  it("accepts a valid cron schedule", () => {
+    const m = { ...validManifestObj(), schedule: { trigger: "cron", cron: "0 7 * * *" } };
+    const result = validateManifest(m);
+    assert.ok(result.valid, `errors: ${result.errors.join(", ")}`);
+  });
+
+  it("accepts a startup schedule", () => {
+    const m = { ...validManifestObj(), schedule: { trigger: "startup" } };
+    const result = validateManifest(m);
+    assert.ok(result.valid, `errors: ${result.errors.join(", ")}`);
+  });
+
+  it("rejects an invalid trigger value", () => {
+    const m = { ...validManifestObj(), schedule: { trigger: "daily" } };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects interval without interval_minutes", () => {
+    const m = { ...validManifestObj(), schedule: { trigger: "interval" } };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects interval_minutes < 1", () => {
+    const m = { ...validManifestObj(), schedule: { trigger: "interval", interval_minutes: 0 } };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects cron trigger without cron expression", () => {
+    const m = { ...validManifestObj(), schedule: { trigger: "cron" } };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects additional properties in schedule", () => {
+    const m = { ...validManifestObj(), schedule: { trigger: "startup", extra: true } };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("email-monitor.agent.json with schedule validates", () => {
+    const manifest = readExample("email-monitor.agent.json");
+    const result = validateManifest(manifest);
+    assert.ok(result.valid, `errors: ${result.errors.join(", ")}`);
+  });
+});
+
+// ─── Constraint violation tests ─────────────────────────────────────────────
+
+describe("constraint violations", () => {
+  it("rejects name longer than 128 characters", () => {
+    const m = validManifestObj();
+    m.name = "a".repeat(129);
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects description longer than 1024 characters", () => {
+    const m = { ...validManifestObj(), description: "a".repeat(1025) };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects max_tokens of 0", () => {
+    const m = validManifestObj();
+    (m.runtime as Record<string, unknown>).max_tokens = 0;
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects fractional max_tokens", () => {
+    const m = validManifestObj();
+    (m.runtime as Record<string, unknown>).max_tokens = 1.5;
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects empty hosts array in network.outbound permission", () => {
+    const m = validManifestObj();
+    m.capabilities = ["network.outbound"];
+    (m as Record<string, unknown>).permissions = { "network.outbound": { hosts: [] } };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects empty vars array in env.read permission", () => {
+    const m = validManifestObj();
+    m.capabilities = ["env.read"];
+    (m as Record<string, unknown>).permissions = { "env.read": { vars: [] } };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects tool binding without required name", () => {
+    const m = { ...validManifestObj(), tools: [{ server: "http://localhost:9000" }] };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects tool binding with empty name", () => {
+    const m = { ...validManifestObj(), tools: [{ name: "", server: "http://localhost:9000" }] };
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects duplicate capabilities", () => {
+    const m = validManifestObj();
+    m.capabilities = ["llm.chat", "llm.chat"];
+    assert.ok(!validateManifest(m).valid);
+  });
+
+  it("rejects additional properties in identity block", () => {
+    const m = validManifestObj();
+    (m.identity as Record<string, unknown>).extra = "nope";
+    assert.ok(!validateManifest(m).valid);
+  });
+});
+
 // ─── loadManifest tests ───────────────────────────────────────────────────────
 
 describe("loadManifest", () => {

@@ -29,7 +29,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAgentVersionRepository>(new JsonAgentVersionRepository(dataDirectory));
         services.AddSingleton<IAttestationRepository>(new JsonAttestationRepository(dataDirectory));
 
-        // Blob store
+        // Blob stores
         if (manifestStore == "Azure")
         {
             var connectionString = configuration["AzureBlobStorage:ConnectionString"]
@@ -41,6 +41,9 @@ public static class ServiceCollectionExtensions
         {
             services.AddSingleton<IManifestBlobStore>(new LocalFileBlobStore(dataDirectory));
         }
+
+        // Bundle blob store (always local for now — Azure option can be added later)
+        services.AddSingleton<IBundleBlobStore>(new LocalFileBundleStore(dataDirectory));
 
         // Identity stores
         services.AddSingleton<IUserStore<Publisher>>(new JsonUserStore(dataDirectory));

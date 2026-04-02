@@ -277,7 +277,7 @@ purfle/
 │       └── Purfle.Marketplace.Tests/ ← 13 tests (registry, attestation, verification)
 ├── sdk/
 │   ├── packages/
-│   │   ├── cli/src/commands/     ← init, build, sign, simulate, publish, search, install, login
+│   │   ├── cli/src/commands/     ← init, build, sign, pack, simulate, publish, search, install, login
 │   │   └── core/src/
 │   ├── package.json
 │   └── tsconfig.json
@@ -334,12 +334,17 @@ purfle/
 - Signing key `com.clarksonr/release-2026` registered in Azure Table Storage
 - Private key at `temp-agent/signing.key.pem` — **do not commit**; `temp-agent/` in `.gitignore`
 
-**SDK & CLI (Phase 3 — Core Complete)**
-- `@purfle/core` — manifest types, structural validation, JWS sign/verify, canonical JSON
-- `@purfle/cli` — all commands: init, build, sign, simulate, publish, search, install, login, validate, run, security-scan
+**SDK & CLI (Phase 3 — Complete)**
+- `@purfle/core` — manifest types, full Ajv Draft 2020-12 validation against spec schema, JWS sign/verify, canonical JSON
+- `@purfle/cli` — all commands: init, build, sign, simulate, publish, search, install, login, validate, run, security-scan, pack
 - `purfle init` — scaffolds agent directory with manifest template
-- `purfle build` — validates manifest against schema
+- `purfle build` — validates manifest against spec schema (Draft 2020-12)
 - `purfle sign` — signs with existing key or generates new key pair
+- `purfle pack` — creates `.purfle` ZIP bundle from signed agent directory
+- `purfle publish` — publishes manifest + uploads bundle to marketplace
+- `purfle install` — downloads bundle (or manifest-only fallback), extracts to local store
+- `ScheduleBlock` type added to manifest.ts (interval, cron, startup)
+- **73 passing core tests**, **16 passing CLI tests**
 
 **Desktop App (Phase 3 — Complete)**
 - .NET MAUI desktop app — builds for Windows and Mac
@@ -407,7 +412,10 @@ purfle/
 - Publisher verification — domain verification via `.well-known/purfle-verify.txt`
 - Attestation service — auto-issues `marketplace-listed` and `publisher-verified` on publish
 - CLI commands fully wired: `publish`, `search`, `install`
-- **13 passing marketplace tests** (registry, attestation, publisher verification)
+- **Bundle hosting** — `.purfle` ZIP upload/download via `IBundleBlobStore` + `LocalFileBundleStore`
+- Bundle endpoints: `PUT /api/agents/{id}/versions/{ver}/bundle`, `GET .../bundle`, `GET .../latest/bundle`
+- `AgentVersion.BundleBlobRef` tracks bundle location per version
+- **19 passing marketplace tests** (registry, attestation, publisher verification, bundle store)
 
 **Dogfood Agent (Phase 4)**
 - `agents/file-assistant/` — reads, lists, searches, summarizes files in workspace
@@ -421,9 +429,9 @@ purfle/
 - `docs/ROADMAP.md` — phase-based roadmap
 
 ### What does NOT exist yet (priority order)
-1. Full Ajv JSON Schema validation in `@purfle/core`
-2. Agent bundle hosting — signed `.purfle` ZIP upload and retrieval
-3. Python agent implementations (Python not available on primary dev machine)
+1. Python agent implementations (Python not available on primary dev machine)
+2. Azure-backed bundle blob store (LocalFileBundleStore only for now)
+3. Bundle integrity hashing (SHA-256 of ZIP stored with version metadata)
 
 ---
 

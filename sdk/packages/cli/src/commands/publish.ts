@@ -1,12 +1,13 @@
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 import { createPublicKey } from "crypto";
 import { parseManifest } from "@purfle/core";
-import { getRegistryUrl, apiPost, loadCredentials } from "../marketplace.js";
+import { getRegistryUrl, apiPost, apiUploadBinary, loadCredentials } from "../marketplace.js";
 
 interface PublishOptions {
   registry?: string;
   registerKey?: string;
+  bundle?: string;
 }
 
 export async function publishCommand(dir: string, options: PublishOptions): Promise<void> {
@@ -74,6 +75,38 @@ export async function publishCommand(dir: string, options: PublishOptions): Prom
   console.log(`Published ${manifest.name} v${manifest.version} to ${registry}`);
   console.log(`  agent_id: ${manifest.id}`);
   console.log(`  key_id:   ${manifest.identity.key_id}`);
+
+  // Upload bundle if available.
+  const bundlePath = options.bundle ?? findBundle(dir, manifest.id, manifest.version);
+  if (bundlePath && existsSync(bundlePath)) {
+    console.log(`Uploading bundle: ${bundlePath}...`);
+    const bundleData = readFileSync(bundlePath);
+    const uploadResult = await apiUploadBinary(
+      registry,
+      `api/agents/${encodeURIComponent(manifest.id)}/versions/${encodeURIComponent(manifest.version)}/bundle`,
+      bundleData
+    );
+    if (uploadResult.status >= 400) {
+      console.error(`Bundle upload failed: ${JSON.stringify(uploadResult.data)}`);
+      process.exit(1);
+    }
+    console.log(`  Bundle uploaded.`);
+  }
+}
+
+/** Look for a .purfle bundle in the agent directory. */
+function findBundle(dir: string, agentId: string, version: string): string | null {
+  // Check for the canonical name first.
+  const canonical = join(dir, `${agentId}-${version}.purfle`);
+  if (existsSync(canonical)) return canonical;
+
+  // Fall back to any .purfle file in the directory.
+  try {
+    const files = readdirSync(dir).filter(f => f.endsWith(".purfle"));
+    if (files.length === 1) return join(dir, files[0]);
+  } catch { /* ignore */ }
+
+  return null;
 }
 
 /**

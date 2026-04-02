@@ -11,6 +11,7 @@ import { loginCommand } from "./commands/login.js";
 import { validateCommand } from "./commands/validate.js";
 import { runCommand } from "./commands/run.js";
 import { securityScanCommand } from "./commands/security-scan.js";
+import { packCommand } from "./commands/pack.js";
 
 const program = new Command();
 
@@ -56,11 +57,20 @@ program
   });
 
 program
+  .command("pack [dir]")
+  .description("Pack an agent directory into a .purfle bundle")
+  .option("-o, --output <filename>", "output filename (defaults to <id>-<version>.purfle)")
+  .action((dir: string = ".", options: { output?: string }) => {
+    packCommand(dir, options);
+  });
+
+program
   .command("publish [dir]")
   .description("Publish a signed agent to the marketplace")
   .option("--registry <url>", "marketplace API URL")
   .option("--register-key <file>", "register public key with the marketplace")
-  .action(async (dir: string = ".", options: { registry?: string; registerKey?: string }) => {
+  .option("--bundle <path>", "path to .purfle bundle to upload")
+  .action(async (dir: string = ".", options: { registry?: string; registerKey?: string; bundle?: string }) => {
     await publishCommand(dir, options);
   });
 

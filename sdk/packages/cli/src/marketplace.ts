@@ -75,6 +75,48 @@ export async function apiPost<T>(
   return { status: resp.status, data };
 }
 
+/** Upload binary data (e.g., .purfle bundle) via PUT. */
+export async function apiUploadBinary<T>(
+  registry: string,
+  path: string,
+  data: Buffer
+): Promise<{ status: number; data: T }> {
+  const url = `${registry.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/octet-stream",
+    ...getAuthHeaders(),
+  };
+  const resp = await fetch(url, {
+    method: "PUT",
+    headers,
+    body: data,
+  });
+  const text = await resp.text();
+  let result: T;
+  try {
+    result = JSON.parse(text) as T;
+  } catch {
+    result = text as unknown as T;
+  }
+  return { status: resp.status, data: result };
+}
+
+/** Download binary data (e.g., .purfle bundle). Returns null on 404. */
+export async function apiDownloadBinary(
+  registry: string,
+  path: string
+): Promise<Buffer | null> {
+  const url = `${registry.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  const resp = await fetch(url, { headers: getAuthHeaders() });
+  if (resp.status === 404) return null;
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`GET ${path} failed (${resp.status}): ${body}`);
+  }
+  const arrayBuf = await resp.arrayBuffer();
+  return Buffer.from(arrayBuf);
+}
+
 /** Path to local agent store. */
 export function agentStorePath(agentId: string): string {
   return join(homedir(), ".purfle", "agents", agentId);

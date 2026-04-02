@@ -26,7 +26,6 @@ export function initCommand(name: string, options: { dir?: string }): void {
       algorithm: "ES256",
       issued_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      signature: "",
     },
     capabilities: [],
     permissions: {},

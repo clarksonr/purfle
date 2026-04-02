@@ -44,6 +44,9 @@ public sealed class JsonAgentVersionRepository : IAgentVersionRepository
     public async Task CreateAsync(AgentVersion version, CancellationToken ct)
         => await _store.AddAsync(version, ct);
 
+    public async Task UpdateAsync(AgentVersion version, CancellationToken ct)
+        => await _store.UpdateAsync(v => v.Id == version.Id, version, ct);
+
     public async Task IncrementDownloadsAsync(Guid versionId, CancellationToken ct)
     {
         var existing = await _store.FindAsync(v => v.Id == versionId, ct);

@@ -19,6 +19,7 @@ public sealed class AgentsController(
     ISigningKeyRepository signingKeys,
     IPublisherRepository publishers,
     IManifestBlobStore blobStore,
+    IBundleBlobStore bundleStore,
     IKeyRegistry keyRegistry,
     Services.AttestationService attestationService) : ControllerBase
 {
@@ -217,6 +218,75 @@ public sealed class AgentsController(
             version = manifest.Version,
             message = "Agent published successfully.",
         });
+    }
+
+    /// <summary>
+    /// Upload a .purfle bundle for a published version.
+    /// The version must already exist (created via Publish).
+    /// </summary>
+    [HttpPut("{agentId}/versions/{version}/bundle")]
+    [Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)]
+    [RequestSizeLimit(50 * 1024 * 1024)] // 50 MB
+    public async Task<ActionResult> UploadBundle(string agentId, string version, CancellationToken ct)
+    {
+        var publisherId = User.GetClaim(OpenIddictConstants.Claims.Subject);
+        if (publisherId is null)
+            return Unauthorized();
+
+        var listing = await agentListings.FindByAgentIdAsync(agentId, ct);
+        if (listing is null)
+            return NotFound();
+        if (listing.PublisherId != publisherId)
+            return Forbid();
+
+        var agentVersion = await agentVersions.FindByAgentIdAndVersionAsync(agentId, version, ct);
+        if (agentVersion is null)
+            return NotFound($"Version {version} not found for agent '{agentId}'.");
+
+        var blobRef = await bundleStore.StoreAsync(agentId, version, Request.Body, ct);
+
+        agentVersion.BundleBlobRef = blobRef;
+        await agentVersions.UpdateAsync(agentVersion, ct);
+
+        return Ok(new { agentId, version, bundleBlobRef = blobRef });
+    }
+
+    /// <summary>
+    /// Download a .purfle bundle for a specific version.
+    /// </summary>
+    [HttpGet("{agentId}/versions/{version}/bundle")]
+    public async Task<ActionResult> DownloadBundle(string agentId, string version, CancellationToken ct)
+    {
+        var agentVersion = await agentVersions.FindByAgentIdAndVersionAsync(agentId, version, ct);
+        if (agentVersion is null)
+            return NotFound();
+
+        if (string.IsNullOrEmpty(agentVersion.BundleBlobRef))
+            return NotFound("No bundle uploaded for this version.");
+
+        await agentVersions.IncrementDownloadsAsync(agentVersion.Id, ct);
+
+        var stream = await bundleStore.RetrieveAsync(agentVersion.BundleBlobRef, ct);
+        return File(stream, "application/zip", $"{agentId}-{version}.purfle");
+    }
+
+    /// <summary>
+    /// Download the latest version's .purfle bundle.
+    /// </summary>
+    [HttpGet("{agentId}/latest/bundle")]
+    public async Task<ActionResult> DownloadLatestBundle(string agentId, CancellationToken ct)
+    {
+        var agentVersion = await agentVersions.FindLatestByAgentIdAsync(agentId, ct);
+        if (agentVersion is null)
+            return NotFound();
+
+        if (string.IsNullOrEmpty(agentVersion.BundleBlobRef))
+            return NotFound("No bundle uploaded for this version.");
+
+        await agentVersions.IncrementDownloadsAsync(agentVersion.Id, ct);
+
+        var stream = await bundleStore.RetrieveAsync(agentVersion.BundleBlobRef, ct);
+        return File(stream, "application/zip", $"{agentId}-{agentVersion.Version}.purfle");
     }
 
     /// <summary>

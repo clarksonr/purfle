@@ -187,6 +187,70 @@ describe("purfle publish", () => {
   });
 });
 
+// ── pack ────────────────────────────────────────────────────────────────────
+
+describe("purfle pack", () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), "purfle-test-"));
+    run(["init", "Pack Test"], { cwd: tmp });
+    // Sign so pack will accept it
+    run(["sign", join(tmp, "pack-test"), "--generate-key"]);
+  });
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it("creates a .purfle bundle from a signed agent", () => {
+    const agentDir = join(tmp, "pack-test");
+    const { stdout, code } = run(["pack", agentDir]);
+    assert.equal(code, 0, `stderr: ${stdout}`);
+    assert.ok(stdout.includes("Packed"));
+    assert.ok(stdout.includes("Pack Test"));
+
+    // A .purfle file should exist in the agent directory
+    const { readdirSync } = require("fs");
+    const files = readdirSync(agentDir).filter((f: string) => f.endsWith(".purfle"));
+    assert.equal(files.length, 1, "Expected exactly one .purfle bundle");
+  });
+
+  it("rejects unsigned manifest", () => {
+    // Create a fresh unsigned agent
+    run(["init", "Unsigned"], { cwd: tmp });
+    const { code, stderr } = run(["pack", join(tmp, "unsigned")]);
+    assert.equal(code, 1);
+    assert.ok(stderr.includes("not signed"));
+  });
+
+  it("bundle extracts back to original files", () => {
+    const agentDir = join(tmp, "pack-test");
+    run(["pack", agentDir]);
+
+    const { readdirSync } = require("fs");
+    const bundleFile = readdirSync(agentDir).find((f: string) => f.endsWith(".purfle"));
+    assert.ok(bundleFile, "Bundle file not found");
+
+    const { extractZip } = require("../dist/zip.js");
+    const bundlePath = join(agentDir, bundleFile);
+    const extractDir = join(tmp, "extracted");
+    const { mkdirSync: mkd } = require("fs");
+    mkd(extractDir, { recursive: true });
+
+    const data = readFileSync(bundlePath);
+    extractZip(data, extractDir);
+
+    // Should contain agent.json
+    assert.ok(existsSync(join(extractDir, "agent.json")));
+
+    // Manifest should be valid
+    const manifest = JSON.parse(readFileSync(join(extractDir, "agent.json"), "utf8"));
+    assert.equal(manifest.name, "Pack Test");
+    assert.ok(manifest.identity.signature, "Extracted manifest should be signed");
+  });
+});
+
 // ── help / version ───────────────────────────────────────────────────────────
 
 describe("purfle --help / --version", () => {

@@ -9,5 +9,6 @@ public interface IAgentVersionRepository
     Task<IReadOnlyList<AgentVersion>> FindByListingIdAsync(Guid listingId, CancellationToken ct = default);
     Task<bool> ExistsAsync(Guid listingId, string version, CancellationToken ct = default);
     Task CreateAsync(AgentVersion version, CancellationToken ct = default);
+    Task UpdateAsync(AgentVersion version, CancellationToken ct = default);
     Task IncrementDownloadsAsync(Guid versionId, CancellationToken ct = default);
 }
