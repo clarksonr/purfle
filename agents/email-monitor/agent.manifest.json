@@ -11,12 +11,25 @@
     "algorithm": "ES256",
     "issued_at": "2026-04-01T00:00:00Z",
     "expires_at": "2027-04-01T00:00:00Z",
-    "signature": ""
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImNvbS5jbGFya3NvbnIvcmVsZWFzZS0yMDI2In0.eyJjYXBhYmlsaXRpZXMiOlsibGxtLmNoYXQiLCJuZXR3b3JrLm91dGJvdW5kIiwiZnMud3JpdGUiXSwiZGVzY3JpcHRpb24iOiJQb2xscyBHbWFpbCBldmVyeSAxNSBtaW51dGVzIGFuZCBzdW1tYXJpemVzIG5ldyBtZXNzYWdlcyB0byBhbiBvdXRwdXQgZmlsZS4iLCJpZCI6ImIyZTRmNmE4LTEyMzQtNGFiYy05ZGVmLTExMTExMTExMTExMSIsImlkZW50aXR5Ijp7ImFsZ29yaXRobSI6IkVTMjU2IiwiYXV0aG9yIjoiY2xhcmtzb25yIiwiZW1haWwiOiJyb21hbkBleGFtcGxlLmNvbSIsImV4cGlyZXNfYXQiOiIyMDI3LTA0LTAxVDAwOjAwOjAwWiIsImlzc3VlZF9hdCI6IjIwMjYtMDQtMDFUMDA6MDA6MDBaIiwia2V5X2lkIjoiY29tLmNsYXJrc29uci9yZWxlYXNlLTIwMjYifSwibGlmZWN5Y2xlIjp7Im9uX2Vycm9yIjoibG9nIn0sIm5hbWUiOiJFbWFpbCBNb25pdG9yIiwicGVybWlzc2lvbnMiOnsiZnMud3JpdGUiOnsicGF0aHMiOlsiLi9vdXRwdXQiXX0sIm5ldHdvcmsub3V0Ym91bmQiOnsiaG9zdHMiOlsibG9jYWxob3N0OjgxMDIiLCJnbWFpbC5nb29nbGVhcGlzLmNvbSJdfX0sInB1cmZsZSI6IjAuMSIsInJ1bnRpbWUiOnsiZW5naW5lIjoiYW50aHJvcGljIiwibWF4X3Rva2VucyI6MTAyNCwibW9kZWwiOiJjbGF1ZGUtc29ubmV0LTQtMjAyNTA1MTQiLCJyZXF1aXJlcyI6InB1cmZsZS8wLjEifSwic2NoZWR1bGUiOnsiaW50ZXJ2YWxfbWludXRlcyI6MTUsInRyaWdnZXIiOiJpbnRlcnZhbCJ9LCJ0b29scyI6W3siZGVzY3JpcHRpb24iOiJMaXN0IHJlY2VudCBlbWFpbHMgZnJvbSBHbWFpbCBpbmJveCIsIm5hbWUiOiJlbWFpbF9saXN0Iiwic2VydmVyIjoiaHR0cDovL2xvY2FsaG9zdDo4MTAyIn0seyJkZXNjcmlwdGlvbiI6IlJlYWQgZnVsbCBlbWFpbCBib2R5IGJ5IG1lc3NhZ2UgSUQiLCJuYW1lIjoiZW1haWxfcmVhZCIsInNlcnZlciI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODEwMiJ9XSwidmVyc2lvbiI6IjEuMC4wIn0.5JSXeXFWFQvYyPKwhb3BxhsdXEPGE-EnwggMHUjGSd0aERB5flH4_FgptfpkSPjsOM-tcgMN79oFlj-KkWJDPw"
   },
-  "capabilities": ["llm.chat", "network.outbound", "fs.write"],
+  "capabilities": [
+    "llm.chat",
+    "network.outbound",
+    "fs.write"
+  ],
   "permissions": {
-    "network.outbound": { "hosts": ["localhost:8102", "gmail.googleapis.com"] },
-    "fs.write": { "paths": ["./output"] }
+    "network.outbound": {
+      "hosts": [
+        "localhost:8102",
+        "gmail.googleapis.com"
+      ]
+    },
+    "fs.write": {
+      "paths": [
+        "./output"
+      ]
+    }
   },
   "schedule": {
     "trigger": "interval",
