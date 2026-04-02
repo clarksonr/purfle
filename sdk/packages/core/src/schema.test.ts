@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { validateManifest, parseManifest } from "./schema.js";
+import { validateManifest, parseManifest, loadManifest } from "./schema.js";
 import type { AgentManifest } from "./manifest.js";
 
 // Resolve spec/examples/ relative to the compiled dist/ directory (4 levels up to repo root)
@@ -35,8 +35,8 @@ function validManifestObj(): Record<string, unknown> {
 // ─── Example file tests (required by task) ───────────────────────────────────
 
 describe("example file validation", () => {
-  it("hello-world.agent.json validates against schema with no errors", () => {
-    const manifest = readExample("hello-world.agent.json");
+  it("assistant.agent.json validates against schema with no errors", () => {
+    const manifest = readExample("assistant.agent.json");
     const result = validateManifest(manifest);
     assert.ok(result.valid, `errors: ${result.errors.join(", ")}`);
     assert.equal(result.errors.length, 0);
@@ -209,6 +209,47 @@ describe("validateManifest", () => {
     };
     const result = validateManifest(m);
     assert.ok(result.valid, `errors: ${result.errors.join(", ")}`);
+  });
+});
+
+// ─── loadManifest tests ───────────────────────────────────────────────────────
+
+describe("loadManifest", () => {
+  it("loads and returns a valid manifest from disk", async () => {
+    const filePath = path.join(SPEC_EXAMPLES, "assistant.agent.json");
+    const manifest = await loadManifest(filePath);
+    assert.equal(typeof manifest.id, "string");
+    assert.equal(typeof manifest.name, "string");
+    assert.equal(manifest.purfle, "0.1");
+  });
+
+  it("throws when file does not exist", async () => {
+    await assert.rejects(
+      () => loadManifest("/does/not/exist.json"),
+      /ENOENT/
+    );
+  });
+
+  it("throws when file contains invalid JSON", async () => {
+    const { writeFileSync, unlinkSync } = await import("node:fs");
+    const tmp = path.join(SPEC_EXAMPLES, "__tmp_bad.json");
+    writeFileSync(tmp, "{ not valid json", "utf8");
+    try {
+      await assert.rejects(() => loadManifest(tmp), /Invalid JSON/);
+    } finally {
+      unlinkSync(tmp);
+    }
+  });
+
+  it("throws when file contains valid JSON that fails schema validation", async () => {
+    const { writeFileSync, unlinkSync } = await import("node:fs");
+    const tmp = path.join(SPEC_EXAMPLES, "__tmp_invalid.json");
+    writeFileSync(tmp, JSON.stringify({ name: "incomplete" }), "utf8");
+    try {
+      await assert.rejects(() => loadManifest(tmp), /validation failed/i);
+    } finally {
+      unlinkSync(tmp);
+    }
   });
 });
 

@@ -1,5 +1,6 @@
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
+import { readFile } from "node:fs/promises";
 import { AgentManifest } from "./manifest.js";
 
 export interface ValidationResult {
@@ -154,6 +155,15 @@ export function validateManifest(manifest: unknown): ValidationResult {
       );
 
   return { valid, errors };
+}
+
+/**
+ * Reads a manifest file from disk, parses, and validates it.
+ * Throws if the file cannot be read, parsed, or fails schema validation.
+ */
+export async function loadManifest(filePath: string): Promise<AgentManifest> {
+  const json = await readFile(filePath, "utf8");
+  return parseManifest(json);
 }
 
 /** Parses manifest JSON and validates it. Returns the typed manifest or throws. */

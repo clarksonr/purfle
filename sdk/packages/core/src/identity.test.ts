@@ -1,10 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  canonicalize,
+  canonicalizeManifest,
   signManifest,
   verifyManifest,
   generateSigningKey,
+  generateKeyPair,
 } from "./identity.js";
 import type { AgentManifest } from "./manifest.js";
 
@@ -32,31 +33,31 @@ function makeManifest(overrides?: Partial<AgentManifest>): AgentManifest {
   };
 }
 
-describe("canonicalize", () => {
+describe("canonicalizeManifest", () => {
   it("strips the signature field", () => {
     const m = makeManifest();
     m.identity.signature = "should-be-removed";
-    const json = canonicalize(m).toString("utf8");
+    const json = canonicalizeManifest(m).toString("utf8");
     assert.ok(!json.includes("should-be-removed"));
     assert.ok(!json.includes('"signature"'));
   });
 
   it("sorts keys lexicographically", () => {
     const m = makeManifest();
-    const json = canonicalize(m).toString("utf8");
+    const json = canonicalizeManifest(m).toString("utf8");
     const parsed = JSON.parse(json);
     const keys = Object.keys(parsed);
     assert.deepStrictEqual(keys, [...keys].sort());
   });
 
   it("produces deterministic output", () => {
-    const a = canonicalize(makeManifest());
-    const b = canonicalize(makeManifest());
+    const a = canonicalizeManifest(makeManifest());
+    const b = canonicalizeManifest(makeManifest());
     assert.deepStrictEqual(a, b);
   });
 
   it("contains no whitespace", () => {
-    const json = canonicalize(makeManifest()).toString("utf8");
+    const json = canonicalizeManifest(makeManifest()).toString("utf8");
     // No spaces/newlines/tabs outside of string values
     const withoutStrings = json.replace(/"[^"]*"/g, '""');
     assert.ok(!/\s/.test(withoutStrings));
@@ -69,6 +70,30 @@ describe("generateSigningKey", () => {
     assert.equal(pair.keyId, "my-key");
     assert.ok(pair.privateKeyPem.includes("BEGIN PRIVATE KEY"));
     assert.ok(pair.publicKeyPem.includes("BEGIN PUBLIC KEY"));
+  });
+});
+
+describe("generateKeyPair", () => {
+  it("returns public and private JWK objects for ES256", () => {
+    const pair = generateKeyPair("ES256");
+    assert.equal(pair.publicKey.kty, "EC");
+    assert.equal(pair.publicKey.crv, "P-256");
+    assert.equal(pair.privateKey.kty, "EC");
+    assert.equal(pair.privateKey.crv, "P-256");
+    // Public key must NOT have 'd' (private scalar)
+    assert.ok(!("d" in pair.publicKey));
+    // Private key must have 'd'
+    assert.ok("d" in pair.privateKey);
+  });
+
+  it("throws for unsupported algorithms", () => {
+    assert.throws(() => generateKeyPair("RS256" as "ES256"), /Unsupported algorithm/);
+  });
+
+  it("each call returns a unique key pair", () => {
+    const a = generateKeyPair("ES256");
+    const b = generateKeyPair("ES256");
+    assert.notEqual(a.publicKey.x, b.publicKey.x);
   });
 });
 
