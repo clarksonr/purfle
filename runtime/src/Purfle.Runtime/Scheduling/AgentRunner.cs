@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Purfle.Runtime.Adapters;
 using Purfle.Runtime.Manifest;
 
@@ -40,6 +41,12 @@ public sealed class AgentRunner
     /// <summary>Error message from the most recent failed run, if any.</summary>
     public string? LastError { get; private set; }
 
+    /// <summary>Token usage from the most recent run (input + output tokens).</summary>
+    public (int Input, int Output) LastTokenUsage { get; private set; }
+
+    /// <summary>Duration of the most recent run.</summary>
+    public TimeSpan? LastRunDuration { get; private set; }
+
     public AgentRunner(AgentManifest manifest, ILlmAdapter llmAdapter, string? promptsDirectory = null)
     {
         Manifest    = manifest;
@@ -60,21 +67,32 @@ public sealed class AgentRunner
         Status    = AgentStatus.Running;
         LastError = null;
         var now   = DateTime.UtcNow;
+        var sw    = Stopwatch.StartNew();
         try
         {
             var systemPrompt = await LoadSystemPromptAsync(ct);
             var userMessage  = $"You have been triggered at {now:O}. Perform your task.";
             var response     = await _llmAdapter.CompleteAsync(systemPrompt, userMessage, ct);
 
+            sw.Stop();
+            LastRunDuration = sw.Elapsed;
+
             await WriteLogAsync(now, response, ct);
+            await WriteStructuredLogAsync(now, sw.Elapsed, "success", null, ct);
             Status  = AgentStatus.Idle;
             LastRun = now;
         }
         catch (Exception ex)
         {
+            sw.Stop();
+            LastRunDuration = sw.Elapsed;
             Status    = AgentStatus.Error;
             LastError = ex.Message;
-            try { await WriteLogAsync(now, $"ERROR: {ex.Message}\n{ex.StackTrace}", ct); }
+            try
+            {
+                await WriteLogAsync(now, $"ERROR: {ex.Message}\n{ex.StackTrace}", ct);
+                await WriteStructuredLogAsync(now, sw.Elapsed, "error", ex.Message, ct);
+            }
             catch { /* best-effort: don't cascade a write failure */ }
         }
     }
@@ -105,5 +123,25 @@ public sealed class AgentRunner
         var logPath = Path.Combine(OutputPath, "run.log");
         var entry   = $"=== {timestamp:O} ==={Environment.NewLine}{content}{Environment.NewLine}{Environment.NewLine}";
         await File.AppendAllTextAsync(logPath, entry, ct);
+    }
+
+    private async Task WriteStructuredLogAsync(
+        DateTime triggerTime, TimeSpan duration, string status, string? error, CancellationToken ct)
+    {
+        Directory.CreateDirectory(OutputPath);
+        var logPath = Path.Combine(OutputPath, "run.jsonl");
+        var entry = new RunLogEntry
+        {
+            AgentId     = Manifest.Id.ToString(),
+            AgentName   = Manifest.Name,
+            TriggerTime = triggerTime.ToString("O"),
+            DurationMs  = (long)duration.TotalMilliseconds,
+            Status      = status,
+            InputTokens = LastTokenUsage.Input,
+            OutputTokens = LastTokenUsage.Output,
+            OutputPath  = OutputPath,
+            Error       = error,
+        };
+        await File.AppendAllTextAsync(logPath, entry.ToJson() + Environment.NewLine, ct);
     }
 }
