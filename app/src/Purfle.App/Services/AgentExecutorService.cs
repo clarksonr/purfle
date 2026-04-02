@@ -82,8 +82,7 @@ public sealed class AgentExecutorService(AgentStore store, IKeyRegistry registry
         var result = await loader.LoadAsync(
             manifestJson,
             assembliesDirectory: hasAssemblies ? assembliesDir : null,
-            ct: ct,
-            trustedLocalInstall: true);
+            ct: ct);
 
         if (!result.Success)
             return (null, installed.Name, "", FallbackSystemPrompt,

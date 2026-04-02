@@ -9,19 +9,31 @@ namespace Purfle.App.Services;
 
 /// <summary>
 /// Adapter factory for the MAUI app.
-/// If <paramref name="engineOverride"/> is set, it takes precedence over the engine
-/// declared in the manifest — the manifest value is treated as a hint only.
+/// Supports engine override, API key injection, and model override.
 /// </summary>
-internal sealed class AppAdapterFactory(string? engineOverride = null) : IAdapterFactory
+internal sealed class AppAdapterFactory(
+    string? engineOverride = null,
+    string? anthropicKey = null,
+    string? geminiKey = null,
+    string? modelOverride = null) : IAdapterFactory
 {
     private readonly HttpClient _http = new();
 
     public IInferenceAdapter Create(AgentManifest manifest, AgentSandbox sandbox, IAgent? agent = null)
-        => (engineOverride ?? manifest.Runtime.Engine) switch
+    {
+        // Set API keys in environment if provided (adapters read from env)
+        if (!string.IsNullOrEmpty(anthropicKey))
+            Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", anthropicKey);
+        if (!string.IsNullOrEmpty(geminiKey))
+            Environment.SetEnvironmentVariable("GEMINI_API_KEY", geminiKey);
+
+        var engine = engineOverride ?? manifest.Runtime.Engine;
+        return engine switch
         {
             "anthropic" => new AnthropicAdapter(manifest, sandbox, _http, null, agent),
             "gemini"    => new GeminiAdapter(manifest, sandbox, _http, null, agent),
             _ => throw new NotSupportedException(
                 $"Engine '{manifest.Runtime.Engine}' is not supported in this runtime.")
         };
+    }
 }

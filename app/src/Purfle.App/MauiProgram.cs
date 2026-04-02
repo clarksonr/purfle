@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Purfle.App.Pages;
 using Purfle.App.Services;
 using Purfle.App.ViewModels;
+using Purfle.Runtime.Identity;
 
 namespace Purfle.App;
 
@@ -21,6 +22,10 @@ public static class MauiProgram
         // Services
         builder.Services.AddSingleton<MarketplaceService>();
         builder.Services.AddSingleton<AgentStore>();
+        builder.Services.AddSingleton<IKeyRegistry>(sp =>
+            new HttpKeyRegistryClient(
+                "https://purfle-key-registry-bxa8bmejh6hhdfe0.centralus-01.azurewebsites.net"));
+        builder.Services.AddSingleton<CredentialService>();
         builder.Services.AddSingleton<AgentExecutorService>();
 
         // Scheduler — scans %LOCALAPPDATA%/aivm/agents at startup
