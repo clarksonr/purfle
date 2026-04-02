@@ -72,12 +72,13 @@ public sealed class AgentRunner
         {
             var systemPrompt = await LoadSystemPromptAsync(ct);
             var userMessage  = $"You have been triggered at {now:O}. Perform your task.";
-            var response     = await _llmAdapter.CompleteAsync(systemPrompt, userMessage, ct);
+            var result       = await _llmAdapter.CompleteAsync(systemPrompt, userMessage, ct);
 
             sw.Stop();
-            LastRunDuration = sw.Elapsed;
+            LastRunDuration  = sw.Elapsed;
+            LastTokenUsage   = (result.InputTokens, result.OutputTokens);
 
-            await WriteLogAsync(now, response, ct);
+            await WriteLogAsync(now, result.Text, ct);
             await WriteStructuredLogAsync(now, sw.Elapsed, "success", null, ct);
             Status  = AgentStatus.Idle;
             LastRun = now;

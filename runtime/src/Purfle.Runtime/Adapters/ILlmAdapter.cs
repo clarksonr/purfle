@@ -7,10 +7,10 @@ namespace Purfle.Runtime.Adapters;
 public interface ILlmAdapter
 {
     /// <summary>
-    /// Sends a single-turn request to the LLM and returns the text response.
+    /// Sends a single-turn request to the LLM and returns the result including token usage.
     /// </summary>
     /// <param name="systemPrompt">System-level instructions for the agent.</param>
     /// <param name="userMessage">The user message for this turn.</param>
-    Task<string> CompleteAsync(string systemPrompt, string userMessage,
+    Task<LlmResult> CompleteAsync(string systemPrompt, string userMessage,
                                CancellationToken ct = default);
 }

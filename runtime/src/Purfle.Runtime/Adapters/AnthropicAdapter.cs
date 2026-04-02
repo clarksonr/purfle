@@ -50,7 +50,7 @@ public sealed class AnthropicAdapter : ILlmAdapter
     /// <exception cref="LlmAdapterException">
     /// Thrown when <c>ANTHROPIC_API_KEY</c> is not set or when the API returns an error.
     /// </exception>
-    public async Task<string> CompleteAsync(
+    public async Task<LlmResult> CompleteAsync(
         string systemPrompt, string userMessage, CancellationToken ct = default)
     {
         var apiKey = Environment.GetEnvironmentVariable(EnvApiKey);
@@ -81,9 +81,13 @@ public sealed class AnthropicAdapter : ILlmAdapter
                      ?? throw new LlmAdapterException(
                          "Anthropic API returned an empty response.");
 
-        return result.Content.First(b => b.Type == "text").Text
+        var text = result.Content.First(b => b.Type == "text").Text
                ?? throw new LlmAdapterException(
                    "Anthropic API response contained no text block.");
+
+        return new LlmResult(text,
+            result.Usage?.InputTokens ?? 0,
+            result.Usage?.OutputTokens ?? 0);
     }
 
     private static readonly JsonSerializerOptions s_jsonOptions = new()
@@ -97,7 +101,9 @@ public sealed class AnthropicAdapter : ILlmAdapter
 
     private sealed record TextMessage(string Role, string Content);
 
-    private sealed record MessagesResponse(ContentBlock[] Content, string StopReason);
+    private sealed record MessagesResponse(ContentBlock[] Content, string StopReason, UsageInfo? Usage);
+
+    private sealed record UsageInfo(int InputTokens, int OutputTokens);
 
     private sealed record ContentBlock(string Type, string? Text);
 }
