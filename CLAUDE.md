@@ -218,39 +218,65 @@ purfle/
 │   ├── examples/
 │   │   ├── hello-world.agent.json
 │   │   ├── assistant.agent.json
-│   │   └── email-monitor.agent.json
+│   │   ├── email-monitor.agent.json
+│   │   └── demo-agent.agent.json
 │   └── rfcs/
 │       └── 0001-identity-model.md
 ├── runtime/
 │   ├── src/
 │   │   ├── Purfle.Runtime/
-│   │   │   ├── Manifest/        ← ManifestLoader, ManifestValidator ✓
-│   │   │   ├── Identity/        ← JWS signing/verification
-│   │   │   ├── Sandbox/         ← capability enforcement
-│   │   │   ├── Lifecycle/       ← agent load/unload
+│   │   │   ├── Manifest/        ← ManifestLoader, ManifestValidator
+│   │   │   ├── Identity/        ← JWS signing/verification, key registry
+│   │   │   ├── Sandbox/         ← CapabilityNegotiator, AgentSandbox
+│   │   │   ├── Lifecycle/       ← LoadResult, LoadFailureReason
 │   │   │   ├── Scheduling/      ← Scheduler, AgentRunner
-│   │   │   └── Adapters/        ← ILlmAdapter, AnthropicAdapter
-│   │   └── Purfle.Runtime.OpenClaw/
+│   │   │   ├── Sessions/        ← ConversationSession
+│   │   │   ├── Tools/           ← BuiltInToolExecutor
+│   │   │   ├── Adapters/        ← ILlmAdapter, IInferenceAdapter
+│   │   │   ├── Assembly/        ← AssemblyLoadContext wiring
+│   │   │   └── Mcp/             ← MCP tool protocol
+│   │   ├── Purfle.Runtime.Anthropic/
+│   │   ├── Purfle.Runtime.Gemini/
+│   │   ├── Purfle.Runtime.OpenClaw/
+│   │   ├── Purfle.Runtime.Ollama/
+│   │   └── Purfle.Runtime.Host/  ← runnable demo with live registry
 │   ├── tests/
-│   │   └── Purfle.Runtime.Tests/
+│   │   └── Purfle.Runtime.Tests/  ← 17 test files, 82+ passing tests
 │   └── Purfle.Runtime.sln
+├── agents/                      ← example agent packages
+│   ├── chat.agent.json
+│   ├── file-search.agent.json
+│   ├── file-summarizer.agent.json
+│   ├── web-research.agent.json
+│   └── src/
+│       ├── Purfle.Agents.Chat/
+│       ├── Purfle.Agents.FileSearch/
+│       └── Purfle.Agents.WebResearch/
+├── registry/
+│   └── src/
+│       └── Purfle.KeyRegistry/   ← Azure Functions (GET/POST/DELETE /keys/{id})
 ├── app/                         ← .NET MAUI desktop app
 │   └── src/
 │       ├── src.sln
 │       └── Purfle.App/
-│           ├── Pages/
-│           ├── Controls/
-│           ├── ViewModels/
-│           └── Services/
+│           ├── Pages/            ← Search, MyAgents, Settings, AgentRun, AgentDetail, LogView
+│           ├── Controls/         ← AgentCard
+│           ├── ViewModels/       ← MainViewModel, AgentCardViewModel
+│           └── Services/         ← AgentStore, AgentExecutorService, AppAdapterFactory, MarketplaceService
+├── marketplace/
+│   └── src/
+│       ├── Purfle.Marketplace.Api/  ← ASP.NET Core (Agents, Auth, Keys controllers)
+│       └── Purfle.Marketplace.Core/ ← entities, repositories
 ├── sdk/
 │   ├── packages/
-│   │   ├── cli/src/commands/
+│   │   ├── cli/src/commands/     ← init, build, sign, simulate, publish, search, install, login
 │   │   └── core/src/
 │   ├── package.json
 │   └── tsconfig.json
-├── marketplace/
 └── docs/
-    ├── ARCHITECTURE.md
+    ├── GETTING_STARTED.md
+    ├── MANIFEST_REFERENCE.md
+    ├── TROUBLESHOOTING.md
     └── ROADMAP.md
 ```
 
@@ -260,54 +286,83 @@ purfle/
 *Update this section at the end of every session.*
 
 ### What exists and works
-- Repo is public under MIT license
-- Monorepo fully scaffolded
-- TypeScript CLI with `simulate` command — runs a single manifest-driven agent
-- Working LLM-backed terminal chat agent (`assistant.agent.json`) using Anthropic SDK
-- `AGENT_MODEL.md` — architecture guardrails doc
-- .NET solution scaffolded (Manifest/Identity/Sandbox/Lifecycle namespaces, xUnit project)
-- `spec/schema/agent.manifest.schema.json` — complete, includes schedule block, ES256
-- `spec/schema/agent.identity.schema.json` — identity block standalone schema
-- `spec/examples/hello-world.agent.json` and `assistant.agent.json` — valid, schema-tested
-- `spec/examples/email-monitor.agent.json` — scheduled agent example (interval, 15 min)
-- `spec/examples/demo-agent.agent.json` — pre-signed manifest used by `dotnet run` in `Purfle.Runtime.Host`
+
+**Spec (Phase 1 — Complete)**
 - `spec/SPEC.md` — human-readable specification
+- `spec/schema/agent.manifest.schema.json` — complete JSON Schema (Draft 2020-12), schedule block, ES256
+- `spec/schema/agent.identity.schema.json` — identity block standalone schema
 - `spec/rfcs/0001-identity-model.md` — JWS/ES256 identity RFC
-- `runtime/.../Manifest/ManifestLoader.cs` — loads and deserializes manifests, tested
-- `runtime/.../Manifest/AgentManifest.cs` — includes `ScheduleBlock` record
-- `runtime/.../Manifest/EmbeddedSchemas.cs` — includes `scheduleBlock` def
-- **`ILlmAdapter`** — `Purfle.Runtime.Adapters.ILlmAdapter` with `CompleteAsync(systemPrompt, userMessage)`
-- **`AnthropicAdapter`** — implements `IInferenceAdapter` + `ILlmAdapter`; reads `ANTHROPIC_API_KEY` directly as runtime infrastructure (agents do not need `env.read` for it)
-- **`AgentRunner`** — loads `prompts/system.md`, calls `ILlmAdapter.CompleteAsync`, appends to `run.log`
-- **`Scheduler`** — drives `AgentRunner` on timer using `schedule.interval_minutes`
-- **82 passing tests** (4 live AI tests skip without API keys)
-- **`.NET MAUI desktop app`** — builds for Windows and Mac
-  - Three tabs: Search (marketplace browser), My Agents (scheduled agent cards), Settings
-  - `AgentCard` control — name, status, last/next run, View Log button
-  - `AgentCardViewModel` — wraps `AgentRunner`, polls status every 5s
-  - `MainViewModel` — `ObservableCollection<AgentCardViewModel>`, `AddAgentCommand`
-  - `MauiProgram` — creates `Scheduler`, scans `%LOCALAPPDATA%/aivm/agents`
-  - `LogViewPage` — scrollable `run.log` viewer
-  - `AgentRunPage` — interactive chat UI backed by `ConversationSession`
-  - `SettingsPage` — marketplace URL, engine picker, API key storage, OAuth PKCE login
-  - `AgentStore` — local install at `~/.purfle/agents/<id>/`; supports raw manifest and `.purfle` ZIP
-  - `AppAdapterFactory` — creates `AnthropicAdapter` or `GeminiAdapter` based on engine preference
-  - `AgentExecutorService` — ephemeral P-256 re-signing for local dev trust model
-- **Live Azure key registry** — `registry/src/Purfle.KeyRegistry` (three Azure Functions: GET/POST/DELETE `/keys/{id}`)
-  - Deployed at `https://purfle-key-registry-bxa8bmejh6hhdfe0.centralus-01.azurewebsites.net`
-  - `HttpKeyRegistryClient` — encodes key IDs with `"/" → "__"` for Azure Table Storage row key compatibility
-  - `Purfle.Runtime.Host` wired to live registry; `dotnet run` verifies signatures against it end-to-end
-  - Signing key `com.clarksonr/release-2026` registered in Azure Table Storage
-  - Private key at `temp-agent/signing.key.pem` — **do not commit**; `temp-agent/` in `.gitignore`
-  - End-to-end trust loop verified: sign → register → load → verify → tamper detection working
-  - `Purfle.KeyRegistry` added to `Purfle.slnx` under `/registry/src/` folder
-- **`Purfle.Runtime.Host/Program.cs`** manifest path fixed — walks up from `AppContext.BaseDirectory` to find repo root (no longer depends on working directory)
+- `spec/examples/` — hello-world, assistant, email-monitor, demo-agent (pre-signed)
+- `AGENT_MODEL.md` — architecture guardrails doc
+
+**Runtime (Phase 2 — Complete)**
+- `AgentLoader` — full 7-step load sequence (parse → schema → identity → capabilities → permissions → I/O → init)
+- `Manifest/` — ManifestLoader, ManifestValidator, AgentManifest with ScheduleBlock
+- `Identity/` — IdentityVerifier, JWS ES256 sign/verify, IKeyRegistry, HttpKeyRegistryClient
+- `Sandbox/` — CapabilityNegotiator, AgentSandbox (network, filesystem, env, MCP enforcement)
+- `Lifecycle/` — LoadResult, LoadFailureReason enum (12 failure reasons)
+- `Tools/` — BuiltInToolExecutor (read_file, write_file, http_get, find_files, search_files)
+- `Sessions/` — ConversationSession for multi-turn chat
+- `Adapters/` — ILlmAdapter, IInferenceAdapter interfaces
+- `Purfle.Runtime.Anthropic` — AnthropicAdapter (reads ANTHROPIC_API_KEY as runtime infra)
+- `Purfle.Runtime.Gemini` — GeminiAdapter
+- `Purfle.Runtime.OpenClaw`, `Purfle.Runtime.Ollama` — stubbed
+- `Scheduler` — drives AgentRunner on timer using schedule.interval_minutes
+- `AgentRunner` — loads prompts/system.md, calls ILlmAdapter.CompleteAsync, appends to run.log
+- `Assembly/` — AssemblyLoadContext wiring (exists, untested with real DLL)
+- **82+ passing tests** (17 test files, 4 live AI tests skip without API keys)
+
+**Key Registry (Phase 2 — Complete)**
+- `registry/src/Purfle.KeyRegistry` — Azure Functions (GET/POST/DELETE `/keys/{id}`)
+- Deployed at `https://purfle-key-registry-bxa8bmejh6hhdfe0.centralus-01.azurewebsites.net`
+- `HttpKeyRegistryClient` — encodes key IDs with `"/" → "__"` for Azure Table Storage compatibility
+- End-to-end trust loop verified: sign → register → load → verify → tamper detection
+- Signing key `com.clarksonr/release-2026` registered in Azure Table Storage
+- Private key at `temp-agent/signing.key.pem` — **do not commit**; `temp-agent/` in `.gitignore`
+
+**SDK & CLI (Phase 3 — Core Complete)**
+- `@purfle/core` — manifest types, structural validation, JWS sign/verify, canonical JSON
+- `@purfle/cli` — all commands: init, build, sign, simulate, publish, search, install, login
+- `purfle init` — scaffolds agent directory with manifest template
+- `purfle build` — validates manifest against schema
+- `purfle sign` — signs with existing key or generates new key pair
+
+**Desktop App (Phase 3 — Complete)**
+- .NET MAUI desktop app — builds for Windows and Mac
+- Pages: Search (marketplace browser), MyAgents (agent cards), Settings, AgentRun (chat UI), AgentDetail, LogView
+- `AgentCard` control — name, status, last/next run, View Log button
+- `AgentCardViewModel` — wraps AgentRunner, polls status every 5s
+- `MainViewModel` — ObservableCollection<AgentCardViewModel>, AddAgentCommand
+- `AgentStore` — local install at `~/.purfle/agents/<id>/`; supports raw manifest and `.purfle` ZIP
+- `AppAdapterFactory` — creates AnthropicAdapter or GeminiAdapter based on engine preference
+- `AgentExecutorService` — ephemeral P-256 re-signing for local dev trust model
+- `SettingsPage` — marketplace URL, engine picker, API key storage, OAuth PKCE login
+- `AgentRunPage` — interactive chat UI backed by ConversationSession with welcome bubble
+
+**Example Agents**
+- `agents/chat.agent.json` + `Purfle.Agents.Chat` — conversational chat agent
+- `agents/file-search.agent.json` + `Purfle.Agents.FileSearch` — file content search with context
+- `agents/file-summarizer.agent.json` — file summarization agent
+- `agents/web-research.agent.json` + `Purfle.Agents.WebResearch` — web research with link extraction
+
+**Marketplace (Phase 4 — Scaffolded)**
+- `Purfle.Marketplace.Api` — ASP.NET Core with Agents, Auth, Keys controllers
+- `Purfle.Marketplace.Core` — AgentListing, AgentVersion, Publisher, SigningKey entities
+- OAuth PKCE login page, DbKeyRegistry service
+- Not yet fully wired to CLI publish/search/install
+
+**Documentation**
+- `docs/GETTING_STARTED.md` — end-to-end walkthrough from install to publish
+- `docs/MANIFEST_REFERENCE.md` — field-by-field manifest reference aligned with schema
+- `docs/TROUBLESHOOTING.md` — error messages, causes, and fixes for all LoadFailureReasons
+- `docs/ROADMAP.md` — phase-based roadmap
 
 ### What does NOT exist yet (priority order)
-1. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`
-2. Agent assembly (`agent.dll`) loading end-to-end — `AssemblyLoadContext` wiring exists but untested with a real DLL
+1. Marketplace backend fully wired — CLI publish/search/install to marketplace API
+2. Agent assembly (`agent.dll`) loading end-to-end — AssemblyLoadContext wiring exists but untested with a real DLL
 3. Windows Credential Manager integration for API key storage
-4. Marketplace backend — scaffolded but not fully wired
+4. CI/CD — GitHub Actions for build, test, schema validation
+5. Full Ajv JSON Schema validation in `@purfle/core`
 
 ---
 
