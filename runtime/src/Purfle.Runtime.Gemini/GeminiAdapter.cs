@@ -276,23 +276,60 @@ public sealed class GeminiAdapter : IInferenceAdapter
 
     // ── HTTP helper ───────────────────────────────────────────────────────────
 
+    private const int MaxRetries = 5;
+
     private async Task<GenerateContentResponse> PostAsync(
         GenerateContentRequest requestBody, CancellationToken ct)
     {
         var url = $"{ApiEndpointBase}/{_model}:generateContent?key={_apiKey}";
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Content   = JsonContent.Create(requestBody, options: s_options);
-
-        using var response = await _http.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode)
+        for (int attempt = 1; attempt <= MaxRetries; attempt++)
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Gemini API {(int)response.StatusCode}: {body}");
+            using var request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Content   = JsonContent.Create(requestBody, options: s_options);
+
+            HttpResponseMessage response;
+            try
+            {
+                response = await _http.SendAsync(request, ct);
+            }
+            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine(
+                    $"[GeminiAdapter] Request timeout (attempt {attempt}/{MaxRetries})");
+                if (attempt == MaxRetries)
+                    throw new InvalidOperationException(
+                        $"Gemini API request timed out after {MaxRetries} attempts.");
+                await Task.Delay(TimeSpan.FromSeconds(Math.Min(Math.Pow(2, attempt - 1), 60)), ct);
+                continue;
+            }
+
+            if ((int)response.StatusCode == 429)
+            {
+                Console.Error.WriteLine(
+                    $"[GeminiAdapter] Rate limited 429 (attempt {attempt}/{MaxRetries})");
+                response.Dispose();
+                if (attempt == MaxRetries)
+                    throw new InvalidOperationException(
+                        $"Gemini API rate limited after {MaxRetries} attempts.");
+                await Task.Delay(TimeSpan.FromSeconds(Math.Min(Math.Pow(2, attempt - 1), 60)), ct);
+                continue;
+            }
+
+            using (response)
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync(ct);
+                    throw new InvalidOperationException($"Gemini API {(int)response.StatusCode}: {body}");
+                }
+
+                return await response.Content.ReadFromJsonAsync<GenerateContentResponse>(s_options, ct)
+                    ?? throw new InvalidOperationException("Gemini API returned an empty response.");
+            }
         }
 
-        return await response.Content.ReadFromJsonAsync<GenerateContentResponse>(s_options, ct)
-            ?? throw new InvalidOperationException("Gemini API returned an empty response.");
+        throw new InvalidOperationException("Unreachable: retry loop exited without result.");
     }
 
     private static readonly JsonSerializerOptions s_options = new()

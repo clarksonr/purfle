@@ -409,22 +409,71 @@ public sealed class AnthropicAdapter : IInferenceAdapter, ILlmAdapter
 
     // ── HTTP helper ───────────────────────────────────────────────────────────
 
+    /// <summary>Maximum retry attempts for transient failures (429 / timeout).</summary>
+    private const int MaxRetries = 5;
+
     private async Task<MessagesResponse> PostAsync(MessagesRequest requestBody, CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, ApiEndpoint);
-        request.Headers.Add("x-api-key", _apiKey);
-        request.Headers.Add("anthropic-version", ApiVersion);
-        request.Content = JsonContent.Create(requestBody, options: s_serializerOptions);
-
-        using var response = await _http.SendAsync(request, ct);
-        if (!response.IsSuccessStatusCode)
+        for (int attempt = 1; attempt <= MaxRetries; attempt++)
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
-            throw new InvalidOperationException($"Anthropic API {(int)response.StatusCode}: {body}");
+            using var request = new HttpRequestMessage(HttpMethod.Post, ApiEndpoint);
+            request.Headers.Add("x-api-key", _apiKey);
+            request.Headers.Add("anthropic-version", ApiVersion);
+            request.Content = JsonContent.Create(requestBody, options: s_serializerOptions);
+
+            HttpResponseMessage response;
+            try
+            {
+                response = await _http.SendAsync(request, ct);
+            }
+            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // HTTP timeout (not user cancellation) — retry with backoff
+                Console.Error.WriteLine(
+                    $"[AnthropicAdapter] Request timeout (attempt {attempt}/{MaxRetries})");
+                if (attempt == MaxRetries)
+                    throw new InvalidOperationException(
+                        $"Anthropic API request timed out after {MaxRetries} attempts.");
+                await DelayWithBackoff(attempt, ct);
+                continue;
+            }
+
+            if ((int)response.StatusCode == 429 || (int)response.StatusCode == 529)
+            {
+                var retryAfter = response.Headers.RetryAfter?.Delta?.TotalSeconds ?? 0;
+                Console.Error.WriteLine(
+                    $"[AnthropicAdapter] Rate limited {(int)response.StatusCode} (attempt {attempt}/{MaxRetries})" +
+                    (retryAfter > 0 ? $", retry-after: {retryAfter}s" : ""));
+                response.Dispose();
+                if (attempt == MaxRetries)
+                    throw new InvalidOperationException(
+                        $"Anthropic API rate limited after {MaxRetries} attempts.");
+                await DelayWithBackoff(attempt, ct, retryAfter);
+                continue;
+            }
+
+            using (response)
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync(ct);
+                    throw new InvalidOperationException($"Anthropic API {(int)response.StatusCode}: {body}");
+                }
+
+                return await response.Content.ReadFromJsonAsync<MessagesResponse>(s_serializerOptions, ct)
+                       ?? throw new InvalidOperationException("Anthropic API returned an empty response.");
+            }
         }
 
-        return await response.Content.ReadFromJsonAsync<MessagesResponse>(s_serializerOptions, ct)
-               ?? throw new InvalidOperationException("Anthropic API returned an empty response.");
+        throw new InvalidOperationException("Unreachable: retry loop exited without result.");
+    }
+
+    private static async Task DelayWithBackoff(int attempt, CancellationToken ct, double retryAfterSeconds = 0)
+    {
+        // Exponential backoff: 1s, 2s, 4s, 8s, 16s — capped at 60s
+        var backoff = Math.Min(Math.Pow(2, attempt - 1), 60);
+        var delay = Math.Max(backoff, retryAfterSeconds);
+        await Task.Delay(TimeSpan.FromSeconds(delay), ct);
     }
 
     // ── Serializer options ────────────────────────────────────────────────────
