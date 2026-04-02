@@ -29,4 +29,9 @@ public partial class MyAgentsPage : ContentPage
                 card.StopPolling();
         }
     }
+
+    private async void OnBrowseMarketplace(object? sender, EventArgs e)
+    {
+        await Shell.Current.GoToAsync("//SearchPage");
+    }
 }

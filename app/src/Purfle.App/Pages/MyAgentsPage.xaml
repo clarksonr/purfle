@@ -10,14 +10,68 @@
                      Command="{Binding AddAgentCommand}" />
     </ContentPage.ToolbarItems>
 
-    <ScrollView>
-        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Agents}" Spacing="0">
-            <BindableLayout.ItemTemplate>
-                <DataTemplate>
-                    <controls:AgentCard BindingContext="{Binding}" />
-                </DataTemplate>
-            </BindableLayout.ItemTemplate>
-        </VerticalStackLayout>
-    </ScrollView>
+    <RefreshView IsRefreshing="{Binding IsRefreshing}"
+                 Command="{Binding RefreshCommand}">
+        <Grid RowDefinitions="Auto,*">
+
+            <!-- Sort controls -->
+            <HorizontalStackLayout Spacing="8" Margin="12,8"
+                                   IsVisible="{Binding HasAgents}">
+                <Label Text="Sort:" FontSize="12" TextColor="Gray" VerticalOptions="Center" />
+                <Button Text="Name"     FontSize="11" Padding="6,2"
+                        BackgroundColor="Transparent" TextColor="#5B5EA6"
+                        Command="{Binding SortCommand}" CommandParameter="name" />
+                <Button Text="Last Run" FontSize="11" Padding="6,2"
+                        BackgroundColor="Transparent" TextColor="#5B5EA6"
+                        Command="{Binding SortCommand}" CommandParameter="lastrun" />
+                <Button Text="Next Run" FontSize="11" Padding="6,2"
+                        BackgroundColor="Transparent" TextColor="#5B5EA6"
+                        Command="{Binding SortCommand}" CommandParameter="nextrun" />
+                <Button Text="Status"   FontSize="11" Padding="6,2"
+                        BackgroundColor="Transparent" TextColor="#5B5EA6"
+                        Command="{Binding SortCommand}" CommandParameter="status" />
+            </HorizontalStackLayout>
+
+            <!-- Agent list -->
+            <ScrollView Grid.Row="1" IsVisible="{Binding HasAgents}">
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Agents}" Spacing="0">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate>
+                            <controls:AgentCard BindingContext="{Binding}" />
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </ScrollView>
+
+            <!-- Empty state -->
+            <VerticalStackLayout Grid.Row="1"
+                                 IsVisible="{Binding IsEmpty}"
+                                 VerticalOptions="Center"
+                                 HorizontalOptions="Center"
+                                 Spacing="16"
+                                 Padding="32">
+                <Label Text="No Agents Installed"
+                       FontSize="20"
+                       FontAttributes="Bold"
+                       HorizontalTextAlignment="Center" />
+                <Label Text="Install agents from the marketplace or add a manifest file to get started."
+                       FontSize="14"
+                       TextColor="Gray"
+                       HorizontalTextAlignment="Center" />
+                <Button Text="Browse Marketplace"
+                        BackgroundColor="#5B5EA6"
+                        TextColor="White"
+                        HorizontalOptions="Center"
+                        Padding="24,12"
+                        CornerRadius="8"
+                        Clicked="OnBrowseMarketplace" />
+                <Button Text="Install from File"
+                        BackgroundColor="Transparent"
+                        TextColor="#5B5EA6"
+                        HorizontalOptions="Center"
+                        Command="{Binding AddAgentCommand}" />
+            </VerticalStackLayout>
+        </Grid>
+    </RefreshView>
 
 </ContentPage>
