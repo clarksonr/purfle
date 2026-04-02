@@ -319,27 +319,28 @@ purfle/
 - `Tools/` — BuiltInToolExecutor (read_file, write_file, http_get, find_files, search_files)
 - `Sessions/` — ConversationSession for multi-turn chat
 - `Adapters/` — ILlmAdapter, IInferenceAdapter interfaces
-- `Purfle.Runtime.Anthropic` — AnthropicAdapter (reads ANTHROPIC_API_KEY as runtime infra, exponential backoff on 429/timeout)
-- `Purfle.Runtime.Gemini` — GeminiAdapter (exponential backoff on 429/timeout)
-- `Purfle.Runtime.OpenClaw` — full OpenAI adapter (gpt-4o default, multi-turn)
-- `Purfle.Runtime.Ollama` — full Ollama adapter (llama3 default, localhost:11434)
+- `Purfle.Runtime.Anthropic` — AnthropicAdapter (reads ANTHROPIC_API_KEY as runtime infra, exponential backoff on 429/timeout, token usage reporting)
+- `Purfle.Runtime.Gemini` — GeminiAdapter (exponential backoff on 429/timeout, token usage reporting via usageMetadata)
+- `Purfle.Runtime.OpenClaw` — full OpenAI adapter (gpt-4o default, multi-turn, token usage reporting)
+- `Purfle.Runtime.Ollama` — full Ollama adapter (llama3 default, localhost:11434, token usage reporting via eval_count)
 - `Ipc/` — IpcRequest, IpcResponse, IpcToolCall, IpcToolResult, ProcessAgentRunner
 - `Platform/` — ICredentialStore, CredentialStoreFactory, Windows/macOS/Linux/InMemory stores
 - `Scheduler` — drives AgentRunner on timer, skips overlapping runs, isolates agent crashes
-- `AgentRunner` — loads prompts/system.md, calls ILlmAdapter.CompleteAsync, structured logging (run.jsonl + run.log)
+- `AgentRunner` — loads prompts/system.md, calls ILlmAdapter.CompleteAsync (returns LlmResult with token usage), structured logging (run.jsonl + run.log)
 - `RunLogEntry` — structured JSON log: agent_id, trigger_time, duration_ms, token usage, status, error
 - `Assembly/` — AgentAssemblyLoadContext (collectible, isolated per agent, Purfle.Sdk shared via default ALC)
 - `Mcp/` — IMcpClient, McpClient (stdio JSON-RPC 2.0, raw BaseStream writes for Windows pipe compat)
 - `Purfle.TestAgents.Hello` — test agent DLL with HelloAgent (IAgent) + GreetTool (IAgentTool)
-- **117 passing tests** (21 test files, 9 assembly load tests, 10 IPC/MCP tests incl. 4 live mcp-file-server integration, 4 live AI tests skip without API keys)
+- **122 passing tests** (22 test files, 9 assembly load tests, 10 IPC/MCP tests incl. 4 live mcp-file-server integration, 4 live AI tests skip without API keys)
 
 **Key Registry (Phase 2 — Complete)**
 - `registry/src/Purfle.KeyRegistry` — Azure Functions (GET/POST/DELETE `/keys/{id}`)
 - Deployed at `https://purfle-key-registry-bxa8bmejh6hhdfe0.centralus-01.azurewebsites.net`
 - `HttpKeyRegistryClient` — encodes key IDs with `"/" → "__"` for Azure Table Storage compatibility
 - End-to-end trust loop verified: sign → register → load → verify → tamper detection
-- Signing key `com.clarksonr/release-2026` registered in Azure Table Storage
-- Private key at `temp-agent/signing.key.pem` — **do not commit**; `temp-agent/` in `.gitignore`
+- Signing key `com.clarksonr/release-2026` — new key pair generated 2026-04-02 (previous key lost)
+- Private key at `temp-agent/signing.key.pem`, public at `temp-agent/signing.pub.pem` — **do not commit**; `temp-agent/` in `.gitignore`
+- **Note:** New public key needs registration with Azure key registry (`PURFLE_REGISTRY_API_KEY` required)
 
 **SDK & CLI (Phase 3 — Complete)**
 - `@purfle/core` — manifest types, full Ajv Draft 2020-12 validation against spec schema, JWS sign/verify, canonical JSON
@@ -429,11 +430,11 @@ purfle/
 - `AgentVersion.BundleBlobRef` tracks bundle location per version
 - **19 passing marketplace tests** (registry, attestation, publisher verification, bundle store)
 
-**Dogfood Agents (Phase 4+5)**
+**Dogfood Agents (Phase 4+5 — Signed)**
 - `agents/file-assistant/` — reads, lists, searches, summarizes files in workspace
-- `agents/email-monitor/` — polls Gmail every 15 min, summarizes new emails (mcp-gmail on :8102)
-- `agents/pr-watcher/` — checks GitHub every 30 min for new PRs (mcp-github on :8111)
-- `agents/report-builder/` — runs at 07:00 daily, reads other agents' output, writes morning report
+- `agents/email-monitor/` — polls Gmail every 15 min, summarizes new emails (mcp-gmail on :8102) — **signed**
+- `agents/pr-watcher/` — checks GitHub every 30 min for new PRs (mcp-github on :8111) — **signed**
+- `agents/report-builder/` — runs at 07:00 daily, reads other agents' output, writes morning report — **signed**
 - `agents/DOGFOOD.md` — setup guide with credential requirements
 - `tools/mcp-file-server/` — MCP server providing file read/list/search tools
 
@@ -445,12 +446,11 @@ purfle/
 - `docs/ROADMAP.md` — phase-based roadmap
 
 ### What does NOT exist yet (priority order)
-1. Dogfood agents need signing — manifests have empty signatures, need `purfle sign` before live registry verification
-2. Token usage tracking in adapters — RunLogEntry has token fields but adapters don't yet report actual usage from API responses
-3. Python agent implementations (Python not available on primary dev machine)
-4. Azure-backed bundle blob store (LocalFileBundleStore only for now)
-5. Bundle integrity hashing (SHA-256 of ZIP stored with version metadata)
-6. macOS notification support (Windows toast notifications implemented, macOS falls back to debug output)
+1. Register new signing public key with Azure key registry (PURFLE_REGISTRY_API_KEY needed) — dogfood manifests are signed but verified only via StaticKeyRegistry until key is registered
+2. Python agent implementations (Python not available on primary dev machine)
+3. Azure-backed bundle blob store (LocalFileBundleStore only for now)
+4. Bundle integrity hashing (SHA-256 of ZIP stored with version metadata)
+5. macOS notification support (Windows toast notifications implemented, macOS falls back to debug output)
 
 ---
 
