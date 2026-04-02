@@ -11,12 +11,25 @@
     "algorithm": "ES256",
     "issued_at": "2026-04-01T00:00:00Z",
     "expires_at": "2027-04-01T00:00:00Z",
-    "signature": ""
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImNvbS5jbGFya3NvbnIvcmVsZWFzZS0yMDI2In0.eyJjYXBhYmlsaXRpZXMiOlsibGxtLmNoYXQiLCJuZXR3b3JrLm91dGJvdW5kIiwiZnMud3JpdGUiXSwiZGVzY3JpcHRpb24iOiJDaGVja3MgR2l0SHViIGV2ZXJ5IDMwIG1pbnV0ZXMgZm9yIG5ldyBwdWxsIHJlcXVlc3RzIGFuZCBzdW1tYXJpemVzIHRoZW0uIiwiaWQiOiJjM2Y1YTdiOS0yMzQ1LTRiY2QtYWVmMC0yMjIyMjIyMjIyMjIiLCJpZGVudGl0eSI6eyJhbGdvcml0aG0iOiJFUzI1NiIsImF1dGhvciI6ImNsYXJrc29uciIsImVtYWlsIjoicm9tYW5AZXhhbXBsZS5jb20iLCJleHBpcmVzX2F0IjoiMjAyNy0wNC0wMVQwMDowMDowMFoiLCJpc3N1ZWRfYXQiOiIyMDI2LTA0LTAxVDAwOjAwOjAwWiIsImtleV9pZCI6ImNvbS5jbGFya3NvbnIvcmVsZWFzZS0yMDI2In0sImxpZmVjeWNsZSI6eyJvbl9lcnJvciI6ImxvZyJ9LCJuYW1lIjoiUFIgV2F0Y2hlciIsInBlcm1pc3Npb25zIjp7ImZzLndyaXRlIjp7InBhdGhzIjpbIi4vb3V0cHV0Il19LCJuZXR3b3JrLm91dGJvdW5kIjp7Imhvc3RzIjpbImxvY2FsaG9zdDo4MTExIiwiYXBpLmdpdGh1Yi5jb20iXX19LCJwdXJmbGUiOiIwLjEiLCJydW50aW1lIjp7ImVuZ2luZSI6ImFudGhyb3BpYyIsIm1heF90b2tlbnMiOjEwMjQsIm1vZGVsIjoiY2xhdWRlLXNvbm5ldC00LTIwMjUwNTE0IiwicmVxdWlyZXMiOiJwdXJmbGUvMC4xIn0sInNjaGVkdWxlIjp7ImludGVydmFsX21pbnV0ZXMiOjMwLCJ0cmlnZ2VyIjoiaW50ZXJ2YWwifSwidG9vbHMiOlt7ImRlc2NyaXB0aW9uIjoiTGlzdCByZWNlbnQgcHVsbCByZXF1ZXN0cyBmcm9tIEdpdEh1YiIsIm5hbWUiOiJwcl9saXN0Iiwic2VydmVyIjoiaHR0cDovL2xvY2FsaG9zdDo4MTExIn0seyJkZXNjcmlwdGlvbiI6IkdldCBwdWxsIHJlcXVlc3QgZGV0YWlscyBpbmNsdWRpbmcgZGlmZiBzdGF0cyIsIm5hbWUiOiJwcl9kZXRhaWwiLCJzZXJ2ZXIiOiJodHRwOi8vbG9jYWxob3N0OjgxMTEifV0sInZlcnNpb24iOiIxLjAuMCJ9.pW_L9tI1vEab2DJBlTIZVT0pfnhOT150l50LCEZYSmuu9N7IZ8JpMxntQSuMT0PPVnCltlrEIWQ3CbQb9Cu2PA"
   },
-  "capabilities": ["llm.chat", "network.outbound", "fs.write"],
+  "capabilities": [
+    "llm.chat",
+    "network.outbound",
+    "fs.write"
+  ],
   "permissions": {
-    "network.outbound": { "hosts": ["localhost:8111", "api.github.com"] },
-    "fs.write": { "paths": ["./output"] }
+    "network.outbound": {
+      "hosts": [
+        "localhost:8111",
+        "api.github.com"
+      ]
+    },
+    "fs.write": {
+      "paths": [
+        "./output"
+      ]
+    }
   },
   "schedule": {
     "trigger": "interval",
