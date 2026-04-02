@@ -59,12 +59,21 @@ public sealed class OpenClawAdapter : IInferenceAdapter, ILlmAdapter
         _http      = http ?? new HttpClient();
     }
 
+    /// <summary>Token usage from the most recent API call.</summary>
+    private int _lastInputTokens;
+    private int _lastOutputTokens;
+
     // ── ILlmAdapter ──────────────────────────────────────────────────────────────
 
     /// <inheritdoc/>
-    Task<string> ILlmAdapter.CompleteAsync(string systemPrompt, string userMessage,
+    async Task<LlmResult> ILlmAdapter.CompleteAsync(string systemPrompt, string userMessage,
                                             CancellationToken ct)
-        => InvokeAsync(systemPrompt, userMessage, ct);
+    {
+        _lastInputTokens = 0;
+        _lastOutputTokens = 0;
+        var text = await InvokeAsync(systemPrompt, userMessage, ct);
+        return new LlmResult(text, _lastInputTokens, _lastOutputTokens);
+    }
 
     // ── Single-turn interface ────────────────────────────────────────────────────
 
@@ -154,8 +163,16 @@ public sealed class OpenClawAdapter : IInferenceAdapter, ILlmAdapter
                 $"OpenAI API {(int)response.StatusCode}: {body}");
         }
 
-        return await response.Content.ReadFromJsonAsync<ChatCompletionResponse>(s_serializerOptions, ct)
+        var result = await response.Content.ReadFromJsonAsync<ChatCompletionResponse>(s_serializerOptions, ct)
                ?? throw new InvalidOperationException("OpenAI API returned an empty response.");
+
+        if (result.Usage is { } usage)
+        {
+            _lastInputTokens  += usage.PromptTokens;
+            _lastOutputTokens += usage.CompletionTokens;
+        }
+
+        return result;
     }
 
     // ── Response extraction ──────────────────────────────────────────────────────
