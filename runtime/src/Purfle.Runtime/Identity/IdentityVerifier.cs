@@ -50,8 +50,10 @@ public sealed class IdentityVerifier(IKeyRegistry keyRegistry)
 
         // 3d — expiry
         if (identity.ExpiresAt <= DateTimeOffset.UtcNow)
-            return VerificationResult.Fail(LoadFailureReason.ManifestExpired,
-                $"Manifest expired at {identity.ExpiresAt:O}.");
+            return VerificationResult.Fail(LoadFailureReason.IdentityExpired,
+                $"Agent identity expired at {identity.ExpiresAt:O} " +
+                $"(key_id: {identity.KeyId}, author: {identity.Author}). " +
+                "Re-sign the manifest with a valid expiry date.");
 
         return VerificationResult.Ok();
     }

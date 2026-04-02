@@ -114,7 +114,7 @@ public sealed class LoadSequenceTests
         var result = await CreateLoader().LoadAsync(json);
 
         Assert.False(result.Success);
-        Assert.Equal(LoadFailureReason.ManifestExpired, result.FailureReason);
+        Assert.Equal(LoadFailureReason.IdentityExpired, result.FailureReason);
     }
 
     // ── 5. Step 4 — capability negotiation ───────────────────────────────────

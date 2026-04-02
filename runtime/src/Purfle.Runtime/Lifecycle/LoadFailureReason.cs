@@ -8,6 +8,7 @@ public enum LoadFailureReason
     KeyRevoked,
     SignatureInvalid,
     ManifestExpired,
+    IdentityExpired,
     CapabilityMissing,
     IoSchemaInvalid,
     EngineNotSupported,

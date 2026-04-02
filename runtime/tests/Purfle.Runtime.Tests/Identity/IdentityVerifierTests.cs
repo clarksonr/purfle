@@ -159,6 +159,6 @@ public sealed class IdentityVerifierTests
         var result = await verifier.VerifyAsync(manifest, rawJson);
 
         Assert.False(result.Success);
-        Assert.Equal(LoadFailureReason.ManifestExpired, result.FailureReason);
+        Assert.Equal(LoadFailureReason.IdentityExpired, result.FailureReason);
     }
 }
