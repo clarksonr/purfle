@@ -1,0 +1,46 @@
+{
+  "purfle": "0.1",
+  "id": "c3f5a7b9-2345-4bcd-aef0-222222222222",
+  "name": "PR Watcher",
+  "version": "1.0.0",
+  "description": "Checks GitHub every 30 minutes for new pull requests and summarizes them.",
+  "identity": {
+    "author": "clarksonr",
+    "email": "roman@example.com",
+    "key_id": "com.clarksonr/release-2026",
+    "algorithm": "ES256",
+    "issued_at": "2026-04-01T00:00:00Z",
+    "expires_at": "2027-04-01T00:00:00Z",
+    "signature": ""
+  },
+  "capabilities": ["llm.chat", "network.outbound", "fs.write"],
+  "permissions": {
+    "network.outbound": { "hosts": ["localhost:8111", "api.github.com"] },
+    "fs.write": { "paths": ["./output"] }
+  },
+  "schedule": {
+    "trigger": "interval",
+    "interval_minutes": 30
+  },
+  "lifecycle": {
+    "on_error": "log"
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1024
+  },
+  "tools": [
+    {
+      "name": "pr_list",
+      "server": "http://localhost:8111",
+      "description": "List recent pull requests from GitHub"
+    },
+    {
+      "name": "pr_detail",
+      "server": "http://localhost:8111",
+      "description": "Get pull request details including diff stats"
+    }
+  ]
+}
