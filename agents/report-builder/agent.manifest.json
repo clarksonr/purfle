@@ -11,12 +11,26 @@
     "algorithm": "ES256",
     "issued_at": "2026-04-01T00:00:00Z",
     "expires_at": "2027-04-01T00:00:00Z",
-    "signature": ""
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImNvbS5jbGFya3NvbnIvcmVsZWFzZS0yMDI2In0.eyJjYXBhYmlsaXRpZXMiOlsibGxtLmNoYXQiLCJmcy5yZWFkIiwiZnMud3JpdGUiXSwiZGVzY3JpcHRpb24iOiJSdW5zIGF0IDA3OjAwIGRhaWx5LCByZWFkcyBvdGhlciBhZ2VudHMnIG91dHB1dCBmaWxlcywgYW5kIHdyaXRlcyBhIGNvbnNvbGlkYXRlZCBtb3JuaW5nIHJlcG9ydC4iLCJpZCI6ImQ0YTZiOGMwLTM0NTYtNGNkZS1iZjAxLTMzMzMzMzMzMzMzMyIsImlkZW50aXR5Ijp7ImFsZ29yaXRobSI6IkVTMjU2IiwiYXV0aG9yIjoiY2xhcmtzb25yIiwiZW1haWwiOiJyb21hbkBleGFtcGxlLmNvbSIsImV4cGlyZXNfYXQiOiIyMDI3LTA0LTAxVDAwOjAwOjAwWiIsImlzc3VlZF9hdCI6IjIwMjYtMDQtMDFUMDA6MDA6MDBaIiwia2V5X2lkIjoiY29tLmNsYXJrc29uci9yZWxlYXNlLTIwMjYifSwibGlmZWN5Y2xlIjp7Im9uX2Vycm9yIjoibG9nIn0sIm5hbWUiOiJSZXBvcnQgQnVpbGRlciIsInBlcm1pc3Npb25zIjp7ImZzLnJlYWQiOnsicGF0aHMiOlsiLi9vdXRwdXQiLCIuLi9lbWFpbC1tb25pdG9yL291dHB1dCIsIi4uL3ByLXdhdGNoZXIvb3V0cHV0Il19LCJmcy53cml0ZSI6eyJwYXRocyI6WyIuL291dHB1dCJdfX0sInB1cmZsZSI6IjAuMSIsInJ1bnRpbWUiOnsiZW5naW5lIjoiYW50aHJvcGljIiwibWF4X3Rva2VucyI6MjA0OCwibW9kZWwiOiJjbGF1ZGUtc29ubmV0LTQtMjAyNTA1MTQiLCJyZXF1aXJlcyI6InB1cmZsZS8wLjEifSwic2NoZWR1bGUiOnsiY3JvbiI6IjAgNyAqICogKiIsInRyaWdnZXIiOiJjcm9uIn0sInZlcnNpb24iOiIxLjAuMCJ9.TO5YRYoneqhoteMvb7DrpaXJd8AKdfmxWU5yqNRQfn5g5LkNR_vSV0agePPF0-hCwqXhRUUGvTA2k_uNrnnFWw"
   },
-  "capabilities": ["llm.chat", "fs.read", "fs.write"],
+  "capabilities": [
+    "llm.chat",
+    "fs.read",
+    "fs.write"
+  ],
   "permissions": {
-    "fs.read": { "paths": ["./output", "../email-monitor/output", "../pr-watcher/output"] },
-    "fs.write": { "paths": ["./output"] }
+    "fs.read": {
+      "paths": [
+        "./output",
+        "../email-monitor/output",
+        "../pr-watcher/output"
+      ]
+    },
+    "fs.write": {
+      "paths": [
+        "./output"
+      ]
+    }
   },
   "schedule": {
     "trigger": "cron",
