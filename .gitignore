@@ -21,3 +21,6 @@ marketplace/src/Purfle.Marketplace.Api/data/
 *TEMP/
 temp-agent/
 temp-agent-*/
+
+# One-off docs
+MARATHON_BUILD.md
