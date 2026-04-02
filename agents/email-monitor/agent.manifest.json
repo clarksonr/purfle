@@ -1,0 +1,46 @@
+{
+  "purfle": "0.1",
+  "id": "b2e4f6a8-1234-4abc-9def-111111111111",
+  "name": "Email Monitor",
+  "version": "1.0.0",
+  "description": "Polls Gmail every 15 minutes and summarizes new messages to an output file.",
+  "identity": {
+    "author": "clarksonr",
+    "email": "roman@example.com",
+    "key_id": "com.clarksonr/release-2026",
+    "algorithm": "ES256",
+    "issued_at": "2026-04-01T00:00:00Z",
+    "expires_at": "2027-04-01T00:00:00Z",
+    "signature": ""
+  },
+  "capabilities": ["llm.chat", "network.outbound", "fs.write"],
+  "permissions": {
+    "network.outbound": { "hosts": ["localhost:8102", "gmail.googleapis.com"] },
+    "fs.write": { "paths": ["./output"] }
+  },
+  "schedule": {
+    "trigger": "interval",
+    "interval_minutes": 15
+  },
+  "lifecycle": {
+    "on_error": "log"
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1024
+  },
+  "tools": [
+    {
+      "name": "email_list",
+      "server": "http://localhost:8102",
+      "description": "List recent emails from Gmail inbox"
+    },
+    {
+      "name": "email_read",
+      "server": "http://localhost:8102",
+      "description": "Read full email body by message ID"
+    }
+  ]
+}

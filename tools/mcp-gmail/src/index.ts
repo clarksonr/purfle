@@ -87,7 +87,62 @@ app.get("/", (_req: Request, res: Response) => {
   });
 });
 
-// --- Tool endpoints ---
+// --- Tool endpoints (POST + GET) ---
+
+// GET support for agents using the built-in http_get tool
+app.get("/tools/email/list", (req: Request, res: Response) => {
+  const maxResults = parseInt(req.query.maxResults as string) || 10;
+  const labelFilter = req.query.label as string | undefined;
+  const unreadOnly = req.query.unreadOnly === "true";
+
+  let results = [...mockEmails];
+  if (unreadOnly) results = results.filter((e) => e.isUnread);
+  if (labelFilter) results = results.filter((e) => e.labels.includes(labelFilter));
+  results = results.slice(0, maxResults);
+
+  res.json({
+    tool: "email/list",
+    provider: "gmail",
+    result: {
+      resultSizeEstimate: results.length,
+      messages: results.map((e) => ({
+        id: e.id, threadId: e.threadId, from: e.from,
+        subject: e.subject, snippet: e.snippet, date: e.date,
+        isUnread: e.isUnread, labels: e.labels, starred: e.starred,
+      })),
+    },
+  });
+});
+
+app.get("/tools/email/read", (req: Request, res: Response) => {
+  const id = req.query.id as string;
+  if (!id) { res.status(400).json({ error: "Missing required parameter: id" }); return; }
+  const email = mockEmails.find((e) => e.id === id);
+  if (!email) { res.status(404).json({ error: `Message not found: ${id}` }); return; }
+  res.json({ tool: "email/read", provider: "gmail", result: email });
+});
+
+app.get("/tools/email/search", (req: Request, res: Response) => {
+  const query = req.query.query as string;
+  if (!query) { res.status(400).json({ error: "Missing required parameter: query" }); return; }
+  const lowerQuery = query.toLowerCase();
+  const results = mockEmails.filter(
+    (e) => e.subject.toLowerCase().includes(lowerQuery) ||
+      e.body.toLowerCase().includes(lowerQuery) ||
+      e.from.name.toLowerCase().includes(lowerQuery) ||
+      e.from.address.toLowerCase().includes(lowerQuery)
+  );
+  res.json({
+    tool: "email/search", provider: "gmail",
+    result: { query, resultSizeEstimate: results.length,
+      messages: results.map((e) => ({
+        id: e.id, threadId: e.threadId, from: e.from,
+        subject: e.subject, snippet: e.snippet, date: e.date,
+        isUnread: e.isUnread, labels: e.labels,
+      })),
+    },
+  });
+});
 
 app.post("/tools/email/list", (req: Request, res: Response) => {
   const maxResults = req.body?.maxResults ?? 10;
