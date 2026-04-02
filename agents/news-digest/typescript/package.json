@@ -1,0 +1,14 @@
+{
+  "name": "@purfle/agent-news-digest",
+  "version": "1.0.0",
+  "description": "Purfle news digest agent — fetches headlines and produces a categorized daily digest",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}

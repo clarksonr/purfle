@@ -1,0 +1,25 @@
+{
+  "$schema": "https://purfle.dev/schema/agent.manifest.schema.json",
+  "purfle": "0.1",
+  "agent": {
+    "id": "dev.purfle.news-digest",
+    "name": "News Digest",
+    "version": "1.0.0",
+    "description": "Fetches news from configured sources, creates a personalized daily digest"
+  },
+  "identity": { "type": "jws", "publicKey": {}, "signature": "" },
+  "capabilities": [
+    { "id": "fetch-news", "mcpTool": "mcp://localhost:8103/news/headlines" },
+    { "id": "search-news", "mcpTool": "mcp://localhost:8103/news/search" },
+    { "id": "summarize-article" }
+  ],
+  "permissions": {
+    "network": { "required": ["newsapi.org"] },
+    "tools": { "mcp": ["mcp://localhost:8103/news/*"] }
+  },
+  "runtime": {
+    "inference": { "provider": "gemini", "model": "gemini-1.5-flash", "fallback": ["ollama:llama3"] },
+    "entrypoints": { "dotnet": "csharp/bin/Release/net10.0/NewsDigest.dll", "node": "typescript/dist/index.js" },
+    "resources": { "memory": "256MB", "timeout": 30000 }
+  }
+}

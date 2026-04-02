@@ -1,0 +1,32 @@
+{
+  "$schema": "https://purfle.dev/schema/agent.manifest.schema.json",
+  "purfle": "0.1",
+  "agent": {
+    "id": "dev.purfle.email-priority",
+    "name": "Email Priority",
+    "version": "1.0.0",
+    "description": "Monitors email accounts, triages by priority, summarizes important messages"
+  },
+  "identity": { "type": "jws", "publicKey": {}, "signature": "" },
+  "capabilities": [
+    { "id": "check-email", "mcpTool": "mcp://localhost:8101/email/list" },
+    { "id": "read-email", "mcpTool": "mcp://localhost:8102/email/read" },
+    { "id": "summarize-email" }
+  ],
+  "permissions": {
+    "network": { "required": ["graph.microsoft.com", "gmail.googleapis.com"] },
+    "tools": { "mcp": ["mcp://localhost:8101/email/*", "mcp://localhost:8102/email/*"] }
+  },
+  "runtime": {
+    "inference": {
+      "provider": "gemini",
+      "model": "gemini-1.5-flash",
+      "fallback": ["anthropic:claude-sonnet-4-20250514", "openai:gpt-4o"]
+    },
+    "entrypoints": {
+      "dotnet": "csharp/bin/Release/net10.0/EmailPriority.dll",
+      "node": "typescript/dist/index.js"
+    },
+    "resources": { "memory": "256MB", "timeout": 30000 }
+  }
+}

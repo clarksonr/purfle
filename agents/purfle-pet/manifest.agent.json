@@ -1,0 +1,36 @@
+{
+  "$schema": "https://purfle.dev/schema/agent.manifest.schema.json",
+  "purfle": "0.1",
+  "agent": {
+    "id": "dev.purfle.purfle-pet",
+    "name": "Purfle Pet",
+    "version": "1.0.0",
+    "description": "A virtual pet that lives in your AIVM — feed it, play with it, watch it grow"
+  },
+  "identity": {
+    "type": "jws",
+    "publicKey": {},
+    "signature": ""
+  },
+  "capabilities": [
+    { "id": "pet-state", "mcpTool": "mcp://localhost:8104/pet/state" },
+    { "id": "pet-feed", "mcpTool": "mcp://localhost:8104/pet/feed" },
+    { "id": "pet-play", "mcpTool": "mcp://localhost:8104/pet/play" }
+  ],
+  "permissions": {
+    "filesystem": { "read": ["./state"], "write": ["./state"] },
+    "tools": { "mcp": ["mcp://localhost:8104/pet/*"] }
+  },
+  "runtime": {
+    "inference": {
+      "provider": "gemini",
+      "model": "gemini-1.5-flash",
+      "fallback": ["ollama:llama3"]
+    },
+    "entrypoints": {
+      "dotnet": "csharp/bin/Release/net10.0/PurflePet.dll",
+      "node": "typescript/dist/index.js"
+    },
+    "resources": { "memory": "128MB", "timeout": 15000 }
+  }
+}

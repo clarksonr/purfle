@@ -1,0 +1,23 @@
+{
+  "name": "@purfle/purfle-pet",
+  "version": "1.0.0",
+  "description": "A virtual pet that lives in your AIVM — feed it, play with it, watch it grow",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "status": "node dist/index.js --status"
+  },
+  "keywords": [
+    "purfle",
+    "agent",
+    "pet",
+    "tamagotchi"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2"
+  }
+}

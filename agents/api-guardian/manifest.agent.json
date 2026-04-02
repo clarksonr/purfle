@@ -1,0 +1,25 @@
+{
+  "$schema": "https://purfle.dev/schema/agent.manifest.schema.json",
+  "purfle": "0.1",
+  "agent": {
+    "id": "dev.purfle.api-guardian",
+    "name": "API Guardian",
+    "version": "1.0.0",
+    "description": "Monitors API endpoints for health, latency, and breaking changes"
+  },
+  "identity": { "type": "jws", "publicKey": {}, "signature": "" },
+  "capabilities": [
+    { "id": "health-check", "mcpTool": "mcp://localhost:8105/api/health" },
+    { "id": "latency-check", "mcpTool": "mcp://localhost:8105/api/latency" },
+    { "id": "schema-diff", "mcpTool": "mcp://localhost:8105/api/schema-diff" }
+  ],
+  "permissions": {
+    "network": { "required": ["*"] },
+    "tools": { "mcp": ["mcp://localhost:8105/api/*"] }
+  },
+  "runtime": {
+    "inference": { "provider": "gemini", "model": "gemini-1.5-flash", "fallback": ["openai:gpt-4o"] },
+    "entrypoints": { "dotnet": "csharp/bin/Release/net10.0/ApiGuardian.dll", "node": "typescript/dist/index.js" },
+    "resources": { "memory": "256MB", "timeout": 60000 }
+  }
+}
