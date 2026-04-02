@@ -15,8 +15,34 @@
 ## SESSION NOTES (updated by Claude Code — do not delete)
 
 - **Python: SKIP.** Python is not installed on the primary dev machine. All "× 3 languages" agents should be built as **C# + TypeScript only** (2 implementations each). A future session can add Python once it's available.
-- **Last verified stop state:** Not yet started. Pre-flight complete — .NET 10.0.102 ✅, Node v24.14.1 ✅, Python ❌ (skipped).
-- **Current phase:** Phase A (not started)
+- **Last verified stop state:** All phases A–I COMPLETE and pushed to main.
+- **Current phase:** ALL PHASES COMPLETE
+- **Last commit pushed:** 480f243 (2026-04-01)
+- **Git log of marathon commits (newest first):**
+  - `480f243` ci+docs+tests: Phase H+I — GitHub Actions, docs updates, new tests
+  - `4cffed6` feat: Phase E+F+G — IdentityHub, Dashboard, SDK CLI commands
+  - `2a143ef` feat(tools): all 10 new MCP servers (ports 8101-8110)
+  - `b092d7b` feat(agents): 5 more polyglot agents (C# + TypeScript)
+  - `6cdddd8` feat(agents): polyglot implementations of 5 core agents (C# + TypeScript)
+  - `14274b2` feat(runtime): Phase A — IPC protocol, inference adapters, credential stores
+
+### Phase completion checklist
+- [x] Phase A: IPC protocol, OpenAI/Ollama adapters, credential stores (Win/Mac/Linux)
+- [x] Phase B: 5 polyglot agents — file-assistant, purfle-pet, email-priority, news-digest, api-guardian
+- [x] Phase C: 5 more polyglot agents — code-reviewer, meeting-assistant, db-assistant, research-assistant, cli-generator
+- [x] Phase D: 11 MCP servers (ports 8100–8110), all TypeScript + Express
+- [x] Phase E: IdentityHub — agent registry, key revocation, trust attestations, JSON storage
+- [x] Phase F: Dashboard — ASP.NET Core API + static HTML/JS, SignalR real-time, dark theme
+- [x] Phase G: SDK CLI — validate, run, security-scan commands added
+- [x] Phase H: CI/CD — GitHub Actions (ci.yml, release.yml, dependabot.yml), docs updated
+- [x] Phase I: Tests — 16 new tests (IPC protocol, credential store, factory), all passing
+- [ ] Final: CLAUDE.md status update, v0.1.0 tag (remaining)
+
+### What to do if resuming from another machine
+1. `git pull origin main` — all work is pushed
+2. `dotnet build runtime/Purfle.Runtime.slnx` — verify runtime builds
+3. Check this SESSION NOTES section for current state
+4. Remaining work: update CLAUDE.md status section, tag v0.1.0
 
 ---
 

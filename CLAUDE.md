@@ -314,11 +314,14 @@ purfle/
 - `Adapters/` — ILlmAdapter, IInferenceAdapter interfaces
 - `Purfle.Runtime.Anthropic` — AnthropicAdapter (reads ANTHROPIC_API_KEY as runtime infra)
 - `Purfle.Runtime.Gemini` — GeminiAdapter
-- `Purfle.Runtime.OpenClaw`, `Purfle.Runtime.Ollama` — stubbed
+- `Purfle.Runtime.OpenClaw` — full OpenAI adapter (gpt-4o default, multi-turn)
+- `Purfle.Runtime.Ollama` — full Ollama adapter (llama3 default, localhost:11434)
+- `Ipc/` — IpcRequest, IpcResponse, IpcToolCall, IpcToolResult, ProcessAgentRunner
+- `Platform/` — ICredentialStore, CredentialStoreFactory, Windows/macOS/Linux/InMemory stores
 - `Scheduler` — drives AgentRunner on timer using schedule.interval_minutes
 - `AgentRunner` — loads prompts/system.md, calls ILlmAdapter.CompleteAsync, appends to run.log
 - `Assembly/` — AssemblyLoadContext wiring (exists, untested with real DLL)
-- **82+ passing tests** (17 test files, 4 live AI tests skip without API keys)
+- **98+ passing tests** (20 test files, 16 new IPC/credential tests, 4 live AI tests skip without API keys)
 
 **Key Registry (Phase 2 — Complete)**
 - `registry/src/Purfle.KeyRegistry` — Azure Functions (GET/POST/DELETE `/keys/{id}`)
@@ -330,7 +333,7 @@ purfle/
 
 **SDK & CLI (Phase 3 — Core Complete)**
 - `@purfle/core` — manifest types, structural validation, JWS sign/verify, canonical JSON
-- `@purfle/cli` — all commands: init, build, sign, simulate, publish, search, install, login
+- `@purfle/cli` — all commands: init, build, sign, simulate, publish, search, install, login, validate, run, security-scan
 - `purfle init` — scaffolds agent directory with manifest template
 - `purfle build` — validates manifest against schema
 - `purfle sign` — signs with existing key or generates new key pair
@@ -347,11 +350,50 @@ purfle/
 - `SettingsPage` — marketplace URL, engine picker, API key storage, OAuth PKCE login
 - `AgentRunPage` — interactive chat UI backed by ConversationSession with welcome bubble
 
-**Example Agents**
+**Polyglot Agents (Marathon Build — C# + TypeScript)**
+- `agents/file-assistant/` — file read/list/search/summarize (C# + TS)
+- `agents/purfle-pet/` — virtual pet with mood/hunger/energy, ASCII art (C# + TS)
+- `agents/email-priority/` — email triage with priority categorization (C# + TS)
+- `agents/news-digest/` — daily news digest with topic categorization (C# + TS)
+- `agents/api-guardian/` — API health monitoring, latency, schema drift (C# + TS)
+- `agents/code-reviewer/` — code analysis, lint, security scanning (C# + TS)
+- `agents/meeting-assistant/` — transcript summarization, action items (C# + TS)
+- `agents/db-assistant/` — SQL schema analysis, query optimization (C# + TS)
+- `agents/research-assistant/` — web research with citations (C# + TS)
+- `agents/cli-generator/` — CLI scaffolding for multiple frameworks (C# + TS)
+- All use IPC stdin/stdout JSON protocol for process-based isolation
+
+**Legacy Example Agents**
 - `agents/chat.agent.json` + `Purfle.Agents.Chat` — conversational chat agent
 - `agents/file-search.agent.json` + `Purfle.Agents.FileSearch` — file content search with context
 - `agents/file-summarizer.agent.json` — file summarization agent
 - `agents/web-research.agent.json` + `Purfle.Agents.WebResearch` — web research with link extraction
+
+**MCP Servers (11 total, ports 8100–8110)**
+- `tools/mcp-file-server/` (8100) — file read/list/search
+- `tools/mcp-microsoft-email/` (8101) — Microsoft Graph email
+- `tools/mcp-gmail/` (8102) — Gmail API email
+- `tools/mcp-news/` (8103) — news headlines/search/sources
+- `tools/mcp-pet/` (8104) — pet state management
+- `tools/mcp-api-tools/` (8105) — API health/latency/schema-diff
+- `tools/mcp-code-tools/` (8106) — code analysis/lint/security
+- `tools/mcp-meeting/` (8107) — transcript/summarize/action-items
+- `tools/mcp-db-tools/` (8108) — schema/query-explain/suggest-index
+- `tools/mcp-research/` (8109) — web-search/fetch-page/extract-links
+- `tools/mcp-cli-gen/` (8110) — CLI scaffold/add-command/generate-help
+
+**IdentityHub**
+- `identityhub/src/Purfle.IdentityHub.Core/` — agent registry, key revocation, trust attestations
+- `identityhub/src/Purfle.IdentityHub.Api/` — minimal API endpoints, JSON file storage
+
+**Dashboard**
+- `dashboard/src/Purfle.Dashboard.Api/` — ASP.NET Core API + static HTML/JS/CSS
+- Dark theme, SignalR real-time agent status, start/stop controls, log streaming
+
+**CI/CD**
+- `.github/workflows/ci.yml` — matrix build (runtime, SDK, dashboard, agents, MCP servers)
+- `.github/workflows/release.yml` — tag-triggered release with artifacts
+- `.github/dependabot.yml` — weekly NuGet + npm dependency monitoring
 
 **Marketplace (Phase 4 — Complete)**
 - `Purfle.Marketplace.Api` — ASP.NET Core with Agents, Auth, Keys, Publishers, Attestations controllers
@@ -377,10 +419,10 @@ purfle/
 
 ### What does NOT exist yet (priority order)
 1. Agent assembly (`agent.dll`) loading end-to-end — AssemblyLoadContext wiring exists but untested with a real DLL
-2. Windows Credential Manager integration for API key storage
-3. CI/CD — GitHub Actions for build, test, schema validation
-4. Full Ajv JSON Schema validation in `@purfle/core`
-5. Agent bundle hosting — signed `.purfle` ZIP upload and retrieval
+2. Full Ajv JSON Schema validation in `@purfle/core`
+3. Agent bundle hosting — signed `.purfle` ZIP upload and retrieval
+4. Python agent implementations (Python not available on primary dev machine)
+5. MCP server integration with ProcessAgentRunner tool dispatch
 
 ---
 
