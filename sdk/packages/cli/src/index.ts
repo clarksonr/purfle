@@ -8,6 +8,9 @@ import { publishCommand } from "./commands/publish.js";
 import { searchCommand } from "./commands/search.js";
 import { installCommand } from "./commands/install.js";
 import { loginCommand } from "./commands/login.js";
+import { validateCommand } from "./commands/validate.js";
+import { runCommand } from "./commands/run.js";
+import { securityScanCommand } from "./commands/security-scan.js";
 
 const program = new Command();
 
@@ -85,6 +88,32 @@ program
   .option("--registry <url>", "marketplace API URL")
   .action(async (options: { registry?: string }) => {
     await loginCommand(options);
+  });
+
+program
+  .command("validate [dir]")
+  .description("Validate an agent manifest (schema, capabilities, identity, schedule)")
+  .option("--strict", "treat warnings as errors")
+  .action((dir: string = ".", options: { strict?: boolean }) => {
+    validateCommand(dir, options);
+  });
+
+program
+  .command("run [dir]")
+  .description("Run an agent locally for development")
+  .option("--timeout <seconds>", "stop after N seconds")
+  .option("-v, --verbose", "show extra debug output")
+  .action((dir: string = ".", options: { timeout?: string; verbose?: boolean }) => {
+    runCommand(dir, options);
+  });
+
+program
+  .command("security-scan [dir]")
+  .description("Scan an agent package for security issues")
+  .option("--public-key <path>", "path to public key PEM for signature verification")
+  .option("-v, --verbose", "show extra detail")
+  .action((dir: string = ".", options: { publicKey?: string; verbose?: boolean }) => {
+    securityScanCommand(dir, options);
   });
 
 program.parse(process.argv);

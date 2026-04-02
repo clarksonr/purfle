@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Purfle.IdentityHub.Core\Purfle.IdentityHub.Core.csproj" />
+    <ProjectReference Include="..\..\..\marketplace\src\Purfle.Marketplace.Core\Purfle.Marketplace.Core.csproj" />
+    <ProjectReference Include="..\..\..\runtime\src\Purfle.Runtime\Purfle.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>
