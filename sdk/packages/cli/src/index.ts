@@ -29,7 +29,11 @@ program
     "--schema <path>",
     "path to manifest JSON Schema (defaults to spec/schema/agent.manifest.schema.json)"
   )
-  .action(async (manifest: string, options: { schema?: string }) => {
+  .option(
+    "--trigger <type>",
+    "override trigger type for simulation (startup, interval, cron, window_open, window_close, interval_within, event)"
+  )
+  .action(async (manifest: string, options: { schema?: string; trigger?: string }) => {
     await simulate(manifest, options);
   });
 

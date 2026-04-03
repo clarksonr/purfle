@@ -152,25 +152,88 @@
       "properties": {
         "trigger": {
           "type": "string",
-          "description": "Trigger type: interval (every N minutes), cron (cron expression), startup (once on AIVM start).",
-          "enum": ["interval", "cron", "startup"]
+          "description": "Trigger type: interval, cron, startup, window, or event.",
+          "enum": ["interval", "cron", "startup", "window", "event"]
         },
         "interval_minutes": {
           "type": "integer",
-          "description": "Required when trigger is 'interval'. How often to run in minutes.",
+          "description": "Required when trigger is 'interval' or window run_at is 'interval_within'.",
           "minimum": 1
         },
         "cron": {
           "type": "string",
           "description": "Required when trigger is 'cron'. Standard 5-field cron expression.",
           "minLength": 1
+        },
+        "window": {
+          "$ref": "#/$defs/windowBlock"
+        },
+        "event": {
+          "$ref": "#/$defs/eventBlock"
         }
       },
-      "if": { "properties": { "trigger": { "const": "interval" } } },
-      "then": { "required": ["interval_minutes"] },
-      "else": {
-        "if": { "properties": { "trigger": { "const": "cron" } } },
-        "then": { "required": ["cron"] }
+      "allOf": [
+        {
+          "if": { "properties": { "trigger": { "const": "interval" } } },
+          "then": { "required": ["interval_minutes"] }
+        },
+        {
+          "if": { "properties": { "trigger": { "const": "cron" } } },
+          "then": { "required": ["cron"] }
+        },
+        {
+          "if": { "properties": { "trigger": { "const": "window" } } },
+          "then": { "required": ["window"] }
+        },
+        {
+          "if": { "properties": { "trigger": { "const": "event" } } },
+          "then": { "required": ["event"] }
+        }
+      ]
+    },
+    "windowBlock": {
+      "type": "object",
+      "description": "Time window configuration for window triggers.",
+      "required": ["start", "end", "run_at"],
+      "additionalProperties": false,
+      "properties": {
+        "start": {
+          "type": "string",
+          "description": "ISO 8601 datetime (one-shot) or cron expression (recurring window open).",
+          "minLength": 1
+        },
+        "end": {
+          "type": "string",
+          "description": "ISO 8601 datetime (one-shot) or cron expression (recurring window close).",
+          "minLength": 1
+        },
+        "run_at": {
+          "type": "string",
+          "description": "When to fire within the window.",
+          "enum": ["window_open", "window_close", "interval_within"]
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA timezone name. Defaults to UTC."
+        }
+      }
+    },
+    "eventBlock": {
+      "type": "object",
+      "description": "Event source configuration for event triggers.",
+      "required": ["source", "topic"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "MCP server URL that emits events.",
+          "format": "uri"
+        },
+        "topic": {
+          "type": "string",
+          "description": "Event topic name to subscribe to.",
+          "minLength": 1
+        }
       }
     },
     "identityBlock": {

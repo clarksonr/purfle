@@ -1,0 +1,40 @@
+{
+  "purfle": "0.1",
+  "id": "e5b7c9d1-4567-4def-c012-444444444444",
+  "name": "Maintenance Window Agent",
+  "version": "1.0.0",
+  "description": "Runs during a daily 6-hour maintenance window (02:00-08:00 UTC) to perform system health checks.",
+  "identity": {
+    "author": "clarksonr",
+    "email": "roman@example.com",
+    "key_id": "com.clarksonr/release-2026",
+    "algorithm": "ES256",
+    "issued_at": "2026-04-01T00:00:00Z",
+    "expires_at": "2027-04-01T00:00:00Z"
+  },
+  "capabilities": ["llm.chat", "fs.write"],
+  "permissions": {
+    "fs.write": {
+      "paths": ["./output"]
+    }
+  },
+  "schedule": {
+    "trigger": "window",
+    "interval_minutes": 30,
+    "window": {
+      "start": "0 2 * * *",
+      "end": "0 8 * * *",
+      "run_at": "interval_within",
+      "timezone": "UTC"
+    }
+  },
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "anthropic",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1024
+  },
+  "lifecycle": {
+    "on_error": "log"
+  }
+}

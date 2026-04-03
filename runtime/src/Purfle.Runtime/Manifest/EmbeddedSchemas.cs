@@ -119,9 +119,31 @@ internal static class EmbeddedSchemas
               "required": ["trigger"],
               "additionalProperties": false,
               "properties": {
-                "trigger": { "type": "string", "enum": ["interval", "cron", "startup"] },
+                "trigger": { "type": "string", "enum": ["interval", "cron", "startup", "window", "event"] },
                 "interval_minutes": { "type": "integer", "minimum": 1 },
-                "cron": { "type": "string", "minLength": 1 }
+                "cron": { "type": "string", "minLength": 1 },
+                "window": { "$ref": "#/$defs/windowBlock" },
+                "event": { "$ref": "#/$defs/eventBlock" }
+              }
+            },
+            "windowBlock": {
+              "type": "object",
+              "required": ["start", "end", "run_at"],
+              "additionalProperties": false,
+              "properties": {
+                "start": { "type": "string", "minLength": 1 },
+                "end": { "type": "string", "minLength": 1 },
+                "run_at": { "type": "string", "enum": ["window_open", "window_close", "interval_within"] },
+                "timezone": { "type": "string" }
+              }
+            },
+            "eventBlock": {
+              "type": "object",
+              "required": ["source", "topic"],
+              "additionalProperties": false,
+              "properties": {
+                "source": { "type": "string", "format": "uri" },
+                "topic": { "type": "string", "minLength": 1 }
               }
             },
             "lifecycleBlock": {

@@ -13,10 +13,24 @@ export type CapabilityString =
   | "fs.write"
   | "mcp.tool";
 
+export interface WindowBlock {
+  start: string;
+  end: string;
+  run_at: "window_open" | "window_close" | "interval_within";
+  timezone?: string;
+}
+
+export interface EventBlock {
+  source: string;
+  topic: string;
+}
+
 export interface ScheduleBlock {
-  trigger: "interval" | "cron" | "startup";
+  trigger: "interval" | "cron" | "startup" | "window" | "event";
   interval_minutes?: number;
   cron?: string;
+  window?: WindowBlock;
+  event?: EventBlock;
 }
 
 export interface AgentManifest {

@@ -288,11 +288,11 @@ Defines when the agent should run automatically.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `trigger` | string enum | Yes | `"interval"`, `"cron"`, or `"startup"` |
-| `interval_minutes` | integer (min 1) | Conditional | Required when trigger is `"interval"` |
+| `trigger` | string enum | Yes | `"interval"`, `"cron"`, `"startup"`, `"window"`, or `"event"` |
+| `interval_minutes` | integer (min 1) | Conditional | Required when trigger is `"interval"` or window `run_at` is `"interval_within"` |
 | `cron` | string (min 1 char) | Conditional | Required when trigger is `"cron"`. Standard 5-field cron expression |
-
-- **Additional properties:** not allowed
+| `window` | object | Conditional | Required when trigger is `"window"`. See Window Trigger below |
+| `event` | object | Conditional | Required when trigger is `"event"`. See Event Trigger below |
 
 **Trigger types:**
 
@@ -301,6 +301,8 @@ Defines when the agent should run automatically.
 | `interval` | Runs every N minutes | `interval_minutes` |
 | `cron` | Runs on a cron schedule | `cron` |
 | `startup` | Runs once when the AIVM starts | none |
+| `window` | Runs relative to a declared time window | `window` |
+| `event` | Runs when an MCP server emits a named event | `event` |
 
 **Examples:**
 
@@ -314,6 +316,91 @@ Defines when the agent should run automatically.
 
 ```json
 { "schedule": { "trigger": "startup" } }
+```
+
+#### Window Trigger
+
+The window trigger fires relative to a declared time window. The `window` object has these fields:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `start` | string | Yes | ISO 8601 datetime (one-shot) or cron expression (recurring window open) |
+| `end` | string | Yes | ISO 8601 datetime (one-shot) or cron expression (recurring window close) |
+| `run_at` | string enum | Yes | `"window_open"`, `"window_close"`, or `"interval_within"` |
+| `timezone` | string | No | IANA timezone name. Defaults to UTC |
+
+**`run_at` modes:**
+
+| Mode | Behavior |
+|---|---|
+| `window_open` | Fires once when the window opens (start time reached) |
+| `window_close` | Fires once shortly before the window closes (default lead time: 60 seconds) |
+| `interval_within` | Fires on `interval_minutes` cadence, only while inside the window. Suppressed outside the window, no catch-up runs after window closes. Requires `interval_minutes` |
+
+Window start/end can be:
+- **ISO 8601 datetime** for one-shot windows (e.g. `"2026-04-15T02:00:00Z"`)
+- **Cron expression** for recurring windows (e.g. `"0 2 * * *"` for daily at 02:00)
+
+**Example: Daily 6-hour maintenance window with interval checks**
+
+```json
+{
+  "schedule": {
+    "trigger": "window",
+    "interval_minutes": 30,
+    "window": {
+      "start": "0 2 * * *",
+      "end": "0 8 * * *",
+      "run_at": "interval_within",
+      "timezone": "UTC"
+    }
+  }
+}
+```
+
+**Example: One-shot window open trigger**
+
+```json
+{
+  "schedule": {
+    "trigger": "window",
+    "window": {
+      "start": "2026-04-15T02:00:00Z",
+      "end": "2026-04-15T08:00:00Z",
+      "run_at": "window_open"
+    }
+  }
+}
+```
+
+#### Event Trigger
+
+The event trigger fires when an MCP server emits a named event. The `event` object has these fields:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `source` | string (URI) | Yes | MCP server URL that emits events |
+| `topic` | string (min 1 char) | Yes | Event topic name to subscribe to |
+
+**Behavior:**
+- At agent load, the AIVM subscribes to the MCP server's event stream
+- When the named topic fires, the agent runs immediately
+- If the agent is already running, the event is queued (one deep)
+- Further events while the queue is full are dropped and logged
+- On agent unload, the AIVM unsubscribes and closes the connection
+
+**Example:**
+
+```json
+{
+  "schedule": {
+    "trigger": "event",
+    "event": {
+      "source": "http://localhost:9090",
+      "topic": "webhook.received"
+    }
+  }
+}
 ```
 
 ---

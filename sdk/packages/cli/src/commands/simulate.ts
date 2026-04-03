@@ -127,7 +127,7 @@ function runNode(entrypointAbs: string): void {
 
 export async function simulate(
   manifestPath: string,
-  options: { schema?: string } = {}
+  options: { schema?: string; trigger?: string } = {}
 ): Promise<void> {
   // 1. Resolve paths
   const absManifest = path.resolve(manifestPath);
@@ -169,6 +169,29 @@ export async function simulate(
     );
   }
 
-  // 4. Simulate
+  // 4. Handle trigger override
+  if (options.trigger) {
+    const validTriggers = [
+      "startup", "interval", "cron",
+      "window_open", "window_close", "interval_within", "event",
+    ];
+    if (!validTriggers.includes(options.trigger)) {
+      console.error(`[purfle] Error: invalid trigger type '${options.trigger}'`);
+      console.error(`  Valid types: ${validTriggers.join(", ")}`);
+      process.exit(1);
+    }
+    console.log(`[purfle] Trigger override: ${options.trigger}`);
+
+    // Map window subtypes to window trigger
+    const windowSubtypes = ["window_open", "window_close", "interval_within"];
+    if (windowSubtypes.includes(options.trigger)) {
+      console.log(`[purfle] Simulating window trigger (run_at=${options.trigger})`);
+      console.log(`[purfle] Window would fire immediately in simulation mode.`);
+    } else if (options.trigger === "event") {
+      console.log(`[purfle] Simulating event trigger — firing once immediately.`);
+    }
+  }
+
+  // 5. Simulate
   simulateExecution(manifest as AgentManifest);
 }

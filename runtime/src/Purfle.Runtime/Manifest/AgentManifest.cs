@@ -112,6 +112,36 @@ public sealed record ScheduleBlock
 
     [JsonPropertyName("cron")]
     public string? Cron { get; init; }
+
+    [JsonPropertyName("window")]
+    public WindowBlock? Window { get; init; }
+
+    [JsonPropertyName("event")]
+    public EventBlock? Event { get; init; }
+}
+
+public sealed record WindowBlock
+{
+    [JsonPropertyName("start")]
+    public required string Start { get; init; }
+
+    [JsonPropertyName("end")]
+    public required string End { get; init; }
+
+    [JsonPropertyName("run_at")]
+    public required string RunAt { get; init; }
+
+    [JsonPropertyName("timezone")]
+    public string? Timezone { get; init; }
+}
+
+public sealed record EventBlock
+{
+    [JsonPropertyName("source")]
+    public required string Source { get; init; }
+
+    [JsonPropertyName("topic")]
+    public required string Topic { get; init; }
 }
 
 public sealed record ToolBinding
