@@ -41,6 +41,9 @@ jobs:
       - name: Test
         run: dotnet test runtime/Purfle.Runtime.slnx --no-build --configuration Release --verbosity normal
 
+      - name: Integration Tests
+        run: dotnet test runtime/tests/Purfle.IntegrationTests/Purfle.IntegrationTests.csproj --configuration Release --verbosity normal
+
   sdk-build:
     name: SDK (build + test)
     runs-on: ubuntu-latest

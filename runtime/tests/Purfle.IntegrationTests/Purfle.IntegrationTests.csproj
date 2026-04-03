@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="coverlet.collector" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Purfle.Runtime\Purfle.Runtime.csproj" />
+    <ProjectReference Include="..\Purfle.TestAgents.Hello\Purfle.TestAgents.Hello.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <!-- Copy test agent assembly for dynamic loading tests -->
+  <Target Name="CopyTestAgentDll" AfterTargets="Build">
+    <PropertyGroup>
+      <AgentSource>$(MSBuildThisFileDirectory)..\Purfle.TestAgents.Hello\bin\$(Configuration)\net10.0</AgentSource>
+      <AgentTarget>$(OutputPath)test-agents\hello</AgentTarget>
+    </PropertyGroup>
+    <MakeDir Directories="$(AgentTarget)" />
+    <Copy
+      SourceFiles="$(AgentSource)\agent.dll;$(AgentSource)\agent.pdb"
+      DestinationFolder="$(AgentTarget)"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Copy test fixtures to output -->
+  <ItemGroup>
+    <None Include="..\..\..\spec\examples\hello-world.agent.json" CopyToOutputDirectory="PreserveNewest" Link="fixtures\hello-world.agent.json" />
+  </ItemGroup>
+
+</Project>
