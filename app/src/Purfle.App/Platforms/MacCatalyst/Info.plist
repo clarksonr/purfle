@@ -36,5 +36,16 @@
 	</array>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>dev.purfle.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>purfle</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
