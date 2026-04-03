@@ -88,6 +88,11 @@
                         <TapGestureRecognizer Tapped="OnTabSystem" />
                     </Label.GestureRecognizers>
                 </Label>
+                <Label x:Name="TabUsage" Text="Usage" FontSize="14" TextColor="Gray">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnTabUsage" />
+                    </Label.GestureRecognizers>
+                </Label>
                 <Label x:Name="TabInstall" Text="Install" FontSize="14" TextColor="Gray">
                     <Label.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnTabInstall" />
@@ -189,6 +194,29 @@
                             FontSize="12"
                             HeightRequest="500"
                             BackgroundColor="#f5f5f5" />
+                </VerticalStackLayout>
+
+                <!-- Usage tab -->
+                <VerticalStackLayout x:Name="UsagePanel" Spacing="10" IsVisible="False">
+                    <Label Text="Token Usage" FontSize="14" FontAttributes="Bold" />
+                    <Label x:Name="UsageSummaryLabel" FontSize="13" TextColor="Gray"
+                           Text="Loading usage data..." />
+                    <CollectionView x:Name="UsageList">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                                      ColumnSpacing="12" Padding="4,6">
+                                    <Label Text="{Binding DateFormatted}" FontSize="11" />
+                                    <Label Grid.Column="1" Text="{Binding Engine}" FontSize="11" TextColor="Gray" />
+                                    <Label Grid.Column="2" Text="{Binding Model}" FontSize="11" TextColor="Gray" />
+                                    <Label Grid.Column="3" Text="{Binding PromptTokensText}" FontSize="11" />
+                                    <Label Grid.Column="4" Text="{Binding CompletionTokensText}" FontSize="11" />
+                                    <Label Grid.Column="5" Text="{Binding TotalTokensText}" FontSize="11" FontAttributes="Bold" />
+                                    <Label Grid.Column="6" Text="{Binding EstCost}" FontSize="11" TextColor="Gray" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
                 </VerticalStackLayout>
 
                 <!-- Install tab -->

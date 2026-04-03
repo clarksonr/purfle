@@ -80,6 +80,7 @@ public partial class AgentDetailPage : ContentPage
         FilesPanel.IsVisible = tab == "files";
         HistoryPanel.IsVisible = tab == "history";
         SystemMdPanel.IsVisible = tab == "system";
+        UsagePanel.IsVisible = tab == "usage";
         InstallPanel.IsVisible = tab == "install";
 
         TabOverview.TextColor = tab == "overview" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
@@ -87,6 +88,7 @@ public partial class AgentDetailPage : ContentPage
         TabFiles.TextColor = tab == "files" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
         TabHistory.TextColor = tab == "history" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
         TabSystem.TextColor = tab == "system" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
+        TabUsage.TextColor = tab == "usage" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
         TabInstall.TextColor = tab == "install" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
 
         TabOverview.FontAttributes = tab == "overview" ? FontAttributes.Bold : FontAttributes.None;
@@ -94,6 +96,7 @@ public partial class AgentDetailPage : ContentPage
         TabFiles.FontAttributes = tab == "files" ? FontAttributes.Bold : FontAttributes.None;
         TabHistory.FontAttributes = tab == "history" ? FontAttributes.Bold : FontAttributes.None;
         TabSystem.FontAttributes = tab == "system" ? FontAttributes.Bold : FontAttributes.None;
+        TabUsage.FontAttributes = tab == "usage" ? FontAttributes.Bold : FontAttributes.None;
         TabInstall.FontAttributes = tab == "install" ? FontAttributes.Bold : FontAttributes.None;
     }
 
@@ -102,6 +105,7 @@ public partial class AgentDetailPage : ContentPage
     private void OnTabFiles(object? s, EventArgs e) { SelectTab("files"); LoadFilesTab(); }
     private void OnTabHistory(object? s, EventArgs e) { SelectTab("history"); LoadHistoryTab(); }
     private void OnTabSystem(object? s, EventArgs e) { SelectTab("system"); LoadSystemMdTab(); }
+    private void OnTabUsage(object? s, EventArgs e) { SelectTab("usage"); LoadUsageTab(); }
     private void OnTabInstall(object? s, EventArgs e) { SelectTab("install"); LoadInstallTab(); }
 
     // --- Overview tab ---
@@ -349,6 +353,51 @@ public partial class AgentDetailPage : ContentPage
             SystemMdEditor.Text = File.ReadAllText(systemMdPath);
         else
             SystemMdEditor.Text = "(No system.md found in this agent's prompts directory)";
+    }
+
+    // --- Usage tab ---
+
+    private void LoadUsageTab()
+    {
+        var usagePath = Path.Combine(_outputDir, "usage.jsonl");
+        if (!File.Exists(usagePath))
+        {
+            UsageSummaryLabel.Text = "No usage recorded yet. This agent hasn't run.";
+            UsageList.ItemsSource = null;
+            return;
+        }
+
+        var entries = new List<UsageEntry>();
+        long totalPrompt = 0, totalCompletion = 0;
+
+        foreach (var line in File.ReadLines(usagePath))
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            try
+            {
+                var doc = JsonDocument.Parse(line).RootElement;
+                var entry = new UsageEntry
+                {
+                    Timestamp = doc.TryGetProperty("ts", out var ts) ? ts.GetString() ?? "" : "",
+                    Engine = doc.TryGetProperty("engine", out var eng) ? eng.GetString() ?? "" : "",
+                    Model = doc.TryGetProperty("model", out var mod) ? mod.GetString() ?? "" : "",
+                    PromptTokens = doc.TryGetProperty("prompt_tokens", out var pt) ? pt.GetInt32() : 0,
+                    CompletionTokens = doc.TryGetProperty("completion_tokens", out var ct2) ? ct2.GetInt32() : 0,
+                    TotalTokens = doc.TryGetProperty("total_tokens", out var tt) ? tt.GetInt32() : 0,
+                };
+                entries.Add(entry);
+                totalPrompt += entry.PromptTokens;
+                totalCompletion += entry.CompletionTokens;
+            }
+            catch { }
+        }
+
+        entries.Reverse();
+        UsageList.ItemsSource = new ObservableCollection<UsageEntry>(entries);
+
+        var totalTotal = totalPrompt + totalCompletion;
+        var estCost = entries.Sum(e => CostConstants.EstimateCost(e.Engine, e.Model, e.PromptTokens, e.CompletionTokens));
+        UsageSummaryLabel.Text = $"All time: {totalPrompt:N0} prompt + {totalCompletion:N0} completion = {totalTotal:N0} total. Estimated: ${estCost:F4}";
     }
 
     // --- Actions ---
@@ -646,4 +695,70 @@ public sealed class RunHistoryEntry : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+public sealed class UsageEntry
+{
+    public string Timestamp { get; init; } = "";
+    public string Engine { get; init; } = "";
+    public string Model { get; init; } = "";
+    public int PromptTokens { get; init; }
+    public int CompletionTokens { get; init; }
+    public int TotalTokens { get; init; }
+
+    public string DateFormatted => DateTimeOffset.TryParse(Timestamp, out var dto)
+        ? dto.LocalDateTime.ToString("MMM d HH:mm") : Timestamp;
+    public string PromptTokensText => $"{PromptTokens:N0}";
+    public string CompletionTokensText => $"{CompletionTokens:N0}";
+    public string TotalTokensText => $"{TotalTokens:N0}";
+    public string EstCost
+    {
+        get
+        {
+            var cost = CostConstants.EstimateCost(Engine, Model, PromptTokens, CompletionTokens);
+            return cost > 0 ? $"${cost:F4}" : "—";
+        }
+    }
+}
+
+/// <summary>
+/// Per-token cost rates for supported engines and models.
+/// Rates sourced as of 2026-04-01 from published pricing pages.
+/// </summary>
+public static class CostConstants
+{
+    // (promptCostPerMillion, completionCostPerMillion)
+    private static readonly Dictionary<string, (decimal prompt, decimal completion)> s_rates = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Gemini — rates from ai.google.dev/pricing (2026-04)
+        ["gemini/gemini-2.0-flash"] = (0.10m, 0.40m),
+        ["gemini/gemini-2.5-flash"] = (0.15m, 0.60m),
+        ["gemini/gemini-2.0-pro"] = (1.25m, 5.00m),
+
+        // Anthropic — rates from anthropic.com/pricing (2026-04)
+        ["anthropic/claude-sonnet-4-20250514"] = (3.00m, 15.00m),
+        ["anthropic/claude-sonnet-4-6"] = (3.00m, 15.00m),
+        ["anthropic/claude-haiku-4-5-20251001"] = (0.80m, 4.00m),
+
+        // OpenAI — rates from openai.com/pricing (2026-04)
+        ["openai/gpt-4o"] = (2.50m, 10.00m),
+        ["openai/gpt-4o-mini"] = (0.15m, 0.60m),
+
+        // Ollama — local, free
+        ["ollama/llama3"] = (0m, 0m),
+    };
+
+    public static decimal EstimateCost(string engine, string model, int promptTokens, int completionTokens)
+    {
+        var key = $"{engine}/{model}";
+        if (s_rates.TryGetValue(key, out var rates))
+        {
+            return (promptTokens * rates.prompt / 1_000_000m) +
+                   (completionTokens * rates.completion / 1_000_000m);
+        }
+        // Try engine-only match for common models
+        if (engine.Equals("ollama", StringComparison.OrdinalIgnoreCase))
+            return 0m;
+        return -1m; // unknown
+    }
 }

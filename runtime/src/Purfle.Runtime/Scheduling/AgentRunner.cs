@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Purfle.Runtime.Adapters;
 using Purfle.Runtime.Manifest;
+using Purfle.Runtime.TokenUsage;
 
 namespace Purfle.Runtime.Scheduling;
 
@@ -20,6 +21,7 @@ public enum AgentStatus { Idle, Running, Error, Stopped }
 public sealed class AgentRunner
 {
     private readonly ILlmAdapter _llmAdapter;
+    private readonly ITokenUsageTracker? _tokenUsageTracker;
 
     public AgentManifest Manifest    { get; }
     public AgentStatus   Status      { get; private set; } = AgentStatus.Idle;
@@ -47,11 +49,14 @@ public sealed class AgentRunner
     /// <summary>Duration of the most recent run.</summary>
     public TimeSpan? LastRunDuration { get; private set; }
 
-    public AgentRunner(AgentManifest manifest, ILlmAdapter llmAdapter, string? promptsDirectory = null)
+    public AgentRunner(AgentManifest manifest, ILlmAdapter llmAdapter,
+                       string? promptsDirectory = null,
+                       ITokenUsageTracker? tokenUsageTracker = null)
     {
         Manifest    = manifest;
         _llmAdapter = llmAdapter;
         PromptsDirectory = promptsDirectory;
+        _tokenUsageTracker = tokenUsageTracker;
         OutputPath  = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "aivm", "output", manifest.Id.ToString());
@@ -77,6 +82,17 @@ public sealed class AgentRunner
             sw.Stop();
             LastRunDuration  = sw.Elapsed;
             LastTokenUsage   = (result.InputTokens, result.OutputTokens);
+
+            if (_tokenUsageTracker is not null)
+            {
+                await _tokenUsageTracker.RecordAsync(
+                    Manifest.Id.ToString(),
+                    Manifest.Runtime.Engine,
+                    Manifest.Runtime.Model ?? "",
+                    result.InputTokens,
+                    result.OutputTokens,
+                    DateTimeOffset.UtcNow);
+            }
 
             await WriteLogAsync(now, result.Text, ct);
             await WriteStructuredLogAsync(now, sw.Elapsed, "success", null, ct);
