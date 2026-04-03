@@ -1,35 +1,14 @@
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 # Purfle
-<img src="purfle-icon.svg" width="120" align="right" />
-Purfle is an AI Virtual Machine (AIVM) — a desktop runtime that loads AI agents the way a JVM loads bytecode: verify identity first, enforce capability boundaries always, execute only what was declared.
 
-Each agent is defined by a **signed manifest** that declares its identity, runtime requirements, capability needs, and permission scope. The AIVM enforces all of it before a single line of agent code runs. An agent cannot exceed the scope it declared. It cannot load on a runtime that cannot satisfy its requirements.
+A desktop runtime that installs, schedules, and sandboxes AI agents on your machine.
 
-The name comes from the inlaid border on a violin — the boundary layer that defines and protects.
-
-→ [Specification](spec/SPEC.md) · [Identity RFC](spec/rfcs/0001-identity-model.md) · [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
-
----
-
-## Why Purfle
-
-AI agent frameworks define behavior. None define identity or load-time safety contracts. The result: agents that silently escalate permissions, frameworks with no way to verify who authored an agent or whether it has been tampered with, and runtimes that grant broad system access with no declared scope.
-
-[OpenClaw](https://openclaw.ai) demonstrated this at scale — 247,000 GitHub stars, widespread adoption, and 9+ CVEs in its first two months because there is no trust model. NVIDIA shipped NemoClaw as a bolt-on sandbox. Purfle designs the trust model in from the start.
-
-The manifest is the unit of distribution and trust. The AIVM enforces it.
-
----
-
-## What It Does
-
-Purfle runs as a desktop app (Windows and Mac). The user installs agents — each defined by a signed `.purfle` package — and the AIVM runs them on a schedule, sandboxed, unattended.
-
-Example agents:
-- `email-monitor` — polls Gmail every 15 minutes, summarizes new mail to a file
-- `pr-watcher` — checks GitHub every 30 minutes for new pull requests
-- `report-builder` — runs at 07:00, reads agent outputs, writes a morning brief
-
-The UI shows one card per agent: status, last run, next run, output log. Agents run in the background. The AIVM enforces what each agent is allowed to do.
+Purfle runs persistently on Windows and macOS. You install agents — each defined by a signed
+manifest — and the AIVM (AI Virtual Machine) runs them on a schedule, unattended. Every agent
+is sandboxed: the runtime enforces what it can access, which LLM engine it uses, and where it
+writes output. You see one card per agent in the desktop UI. Agents run in the background.
+The AIVM guards the hen house.
 
 ---
 
@@ -37,60 +16,166 @@ The UI shows one card per agent: status, last run, next run, output log. Agents 
 
 ```
 ┌─────────────────────────────────────────────┐
-│           .NET MAUI DESKTOP APP              │
-│                                             │
+│      .NET MAUI DESKTOP APP                  │
+│      (MSIX on Windows / .pkg on macOS)      │
 │  ┌──────────────────────────────────────┐   │
 │  │              AIVM (C#)               │   │
-│  │                                      │   │
 │  │  Scheduler                           │   │
 │  │  ├── AgentRunner: email-monitor      │   │
 │  │  ├── AgentRunner: pr-watcher         │   │
 │  │  └── AgentRunner: report-builder     │   │
-│  │                                      │   │
-│  │  Each AgentRunner:                   │   │
-│  │  ├── Own thread                      │   │
-│  │  ├── Sandbox (manifest-enforced)     │   │
-│  │  ├── MCP tool connections            │   │
-│  │  ├── LLM adapter (Anthropic first)   │   │
-│  │  └── Output → /aivm/output/<id>/     │   │
 │  └──────────────────────────────────────┘   │
-│                                             │
 │  UI: one card per agent                     │
+└──────────────┬──────────────────────────────┘
+               │ talks to
+┌──────────────▼──────────────────────────────┐
+│           AZURE (live services)              │
+│  Key Registry   — Functions (consumption)   │
+│  Marketplace    — App Service (F1 free)     │
+│  IdentityHub.Web — App Service (F1 free)    │
+└─────────────────────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────┐
+│  purfle demo  — starts these locally        │
+│  mcp-file-server :8100                      │
+│  mcp-gmail       :8102                      │
+│  mcp-github      :8111                      │
 └─────────────────────────────────────────────┘
 ```
 
-The AIVM is a C# class inside a .NET MAUI app — not a separate process or daemon. Agents run on isolated threads in their own `AssemblyLoadContext`. The LLM never touches the system directly; it proposes tool calls, and the AIVM executes them within the declared permission scope.
+---
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| Multi-engine LLM | Gemini, Anthropic, OpenAI, Ollama — engine declared per agent |
+| Signed manifests | JWS with ES256 — every agent is cryptographically signed |
+| 5 trigger types | interval, cron, startup, window, event (SSE) |
+| MCP tool protocol | Agents call tools through MCP servers wired by the AIVM |
+| Sandboxed execution | Network, filesystem, env vars — enforced per manifest |
+| Windows + macOS | .NET MAUI — one codebase, two platforms |
+| Marketplace | Publish, search, and install agents from a central registry |
+| Engine-agnostic | No hardcoded engine — the manifest decides |
+| Dashboard | Live summary of all agents with digest, status, and output preview |
 
 ---
 
-## Status
+## Quick Start
 
-| Phase | What | Status |
-|---|---|---|
-| 1 | Manifest spec + JSON Schema | ✅ Complete |
-| 2 | AIVM runtime core | ✅ Complete — 82 passing tests |
-| 3 | .NET MAUI desktop app | ✅ Working — Windows + Mac |
-| 3 | TypeScript SDK + CLI | 🔧 In progress |
-| 4 | Marketplace + key registry | 🗓 Planned |
+### Prerequisites
 
-The AIVM scheduler, agent runner, LLM adapters (Anthropic), manifest loader and validator, and the desktop UI (agent cards, log viewer, settings, OAuth PKCE) are all working. The TypeScript CLI can simulate a manifest-driven agent end-to-end using the Anthropic API.
+- [.NET 10 SDK](https://dotnet.microsoft.com/)
+- [Node.js](https://nodejs.org/) (LTS)
+- An LLM API key (set `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, or `OPENAI_API_KEY`)
+
+### Steps
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/clarksonr/purfle.git
+   cd purfle
+   ```
+
+2. **Build the runtime and SDK**
+
+   ```bash
+   dotnet build runtime/src/Purfle.Runtime/Purfle.Runtime.csproj
+   cd sdk && npm install && npm run build && cd ..
+   ```
+
+3. **Start the demo environment**
+
+   ```bash
+   npx purfle demo
+   ```
+
+   This starts local MCP servers (file, Gmail, GitHub) and prints a summary table.
+
+4. **Open the desktop app**
+
+   ```bash
+   dotnet run --project app/src/Purfle.App/Purfle.App.csproj
+   ```
+
+   The Dashboard shows installed agents, their status, and today's digest.
 
 ---
 
-## Repo Structure
+## How Agents Work
+
+An agent is a signed package containing a manifest, optional .NET assemblies, and prompt files:
 
 ```
-purfle/
-├── spec/               ← Manifest spec, JSON Schema, RFCs, examples
-├── runtime/            ← .NET / C# AIVM core library
-├── app/                ← .NET MAUI desktop app
-├── sdk/                ← TypeScript CLI + core library
-├── marketplace/        ← Registry and distribution (planned)
-└── docs/               ← Architecture and roadmap
+my-agent.purfle/
+├── agent.manifest.json     ← signed, declares everything
+├── lib/
+│   └── MyAgent.dll         ← .NET assembly (optional)
+├── prompts/
+│   └── system.md           ← instruction file
+└── assets/                 ← optional embedded resources
 ```
+
+### Minimal manifest (Hello World)
+
+```json
+{
+  "purfle": "0.1",
+  "id": "11111111-1111-4111-a111-111111111111",
+  "name": "Hello World",
+  "version": "0.1.0",
+  "description": "Minimal agent for local demonstration.",
+  "identity": {
+    "author": "clarksonr",
+    "email": "roman@example.com",
+    "key_id": "hello-key-001",
+    "algorithm": "ES256",
+    "issued_at": "2026-03-27T00:00:00Z",
+    "expires_at": "2027-03-27T00:00:00Z"
+  },
+  "capabilities": ["llm.chat"],
+  "runtime": {
+    "requires": "purfle/0.1",
+    "engine": "gemini",
+    "model": "gemini-2.0-flash"
+  }
+}
+```
+
+The AIVM reads this manifest, verifies the signature, checks capabilities, selects
+the LLM adapter, and runs the agent on its declared schedule. The agent never touches
+the system directly — the AIVM executes on its behalf.
+
+---
+
+## Stack
+
+| Layer | Technology |
+|---|---|
+| Desktop | .NET MAUI (C#) — Windows + macOS |
+| AIVM | C# class inside MAUI |
+| Manifest spec | JSON Schema Draft 2020-12 |
+| Agent identity | JWS / ES256 |
+| Inference | Engine-agnostic: Gemini, OpenAI, Ollama, Anthropic |
+| Scheduler | PeriodicTimer + NCrontab + WindowTrigger + EventTrigger (SSE) |
+| SDK / CLI | TypeScript / Node.js |
+| Tests | xUnit + Jest |
+| Azure | Functions consumption + App Service F1 |
+| IaC | Bicep |
+
+---
+
+## Docs
+
+- [Getting Started](docs/GETTING_STARTED.md)
+- [Manifest Reference](docs/MANIFEST_REFERENCE.md)
+- [Publishing Agents](docs/PUBLISHING.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Roadmap](docs/ROADMAP.md)
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE)
