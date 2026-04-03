@@ -15,4 +15,5 @@ public enum LoadFailureReason
     AssemblyLoadFailed,
     AssemblyEntryPointMissing,
     InitFailed,
+    InvalidCrossAgentReference,
 }

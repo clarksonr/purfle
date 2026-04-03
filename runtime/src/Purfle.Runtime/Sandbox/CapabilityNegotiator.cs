@@ -30,6 +30,7 @@ public static class CapabilityNegotiator
         public const string FsRead         = "fs.read";
         public const string FsWrite        = "fs.write";
         public const string McpTool        = "mcp.tool";
+        public const string AgentRead      = "agent.read";
     }
 
     /// <summary>
@@ -37,7 +38,7 @@ public static class CapabilityNegotiator
     /// Declaring these in the manifest is harmless but never causes a failure.
     /// </summary>
     private static readonly HashSet<string> s_alwaysSatisfied =
-        new(["inference", "llm.chat", "llm.completion"], StringComparer.Ordinal);
+        new(["inference", "llm.chat", "llm.completion", "agent.read"], StringComparer.Ordinal);
 
     /// <summary>
     /// Compares <paramref name="agentCapabilities"/> against

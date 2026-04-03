@@ -62,7 +62,19 @@
     },
     "io": {
       "type": "object",
-      "description": "Optional input/output schema hints. No enforcement in phase 1."
+      "description": "Optional input/output configuration. io.reads declares which peer agents this agent may read output from.",
+      "additionalProperties": false,
+      "properties": {
+        "reads": {
+          "type": "array",
+          "description": "Agent IDs whose output this agent is allowed to read. Requires 'agent.read' in capabilities.",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "uniqueItems": true
+        }
+      }
     }
   },
   "allOf": [
@@ -141,7 +153,8 @@
         "env.read",
         "fs.read",
         "fs.write",
-        "mcp.tool"
+        "mcp.tool",
+        "agent.read"
       ]
     },
     "scheduleBlock": {
