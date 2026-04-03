@@ -13,7 +13,7 @@
                 <Label Text="{Binding Name}"
                        FontAttributes="Bold"
                        FontSize="16" />
-                <!-- Status dot with color -->
+                <!-- Status dot with pulse animation via opacity binding -->
                 <Border Grid.Column="1"
                         WidthRequest="12" HeightRequest="12"
                         StrokeThickness="0"
@@ -31,7 +31,7 @@
                        VerticalOptions="Center" />
             </HorizontalStackLayout>
 
-            <!-- Row 2: Run times -->
+            <!-- Row 2: Last run (relative) + Next run -->
             <HorizontalStackLayout Grid.Row="2" Spacing="16">
                 <Label FontSize="12" TextColor="Gray">
                     <Label.FormattedText>
@@ -58,7 +58,7 @@
                    TextColor="Gray"
                    IsVisible="{Binding HasTokenUsage}" />
 
-            <!-- Row 4: Output preview -->
+            <!-- Row 4: Output preview (first 100 chars) -->
             <Frame Grid.Row="4"
                    Padding="8" Margin="0,4,0,0"
                    BackgroundColor="{AppThemeBinding Light=#F8F8F8, Dark=#1A1A1A}"
@@ -73,7 +73,16 @@
                        MaxLines="2" />
             </Frame>
 
-            <!-- Row 5: Error badge (tap to expand) -->
+            <!-- Row 4 (alt): No output yet -->
+            <Label Grid.Row="4"
+                   Text="No output yet"
+                   FontSize="11"
+                   TextColor="Gray"
+                   FontAttributes="Italic"
+                   Margin="0,4,0,0"
+                   IsVisible="{Binding ShowNoOutputYet}" />
+
+            <!-- Row 5: Error badge (tap to expand) — first 120 chars + ellipsis -->
             <Frame Grid.Row="5"
                    Padding="8" Margin="0,4,0,0"
                    BackgroundColor="#FFF0F0"

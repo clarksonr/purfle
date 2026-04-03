@@ -11,7 +11,9 @@ public sealed class AgentCardViewModel : INotifyPropertyChanged
     private IDispatcherTimer?    _timer;
     private bool                 _errorExpanded;
     private double               _statusDotOpacity = 1.0;
+    private bool                 _pulseHigh = true;
 
+    public AgentRunner Runner => _runner;
     public string Name       => _runner.Manifest.Name;
     public string OutputPath => _runner.OutputPath;
 
@@ -32,7 +34,8 @@ public sealed class AgentCardViewModel : INotifyPropertyChanged
         AgentStatus.Stopped => "Stopped",
         _                   => Status.ToString(),
     };
-    public string LastRunText => _runner.LastRun?.ToString("g") ?? "Never";
+
+    public string LastRunText => FormatRelativeTime(_runner.LastRun);
     public string NextRunText => _runner.NextRun?.ToString("g") ?? "\u2014";
 
     // Token usage
@@ -48,13 +51,23 @@ public sealed class AgentCardViewModel : INotifyPropertyChanged
         }
     }
 
-    // Output preview (last 2 lines of most recent output)
+    // Output preview (first 100 chars of most recent output)
     public bool HasOutputPreview => !string.IsNullOrEmpty(OutputPreview);
     public string OutputPreview { get; private set; } = "";
+    public bool ShowNoOutputYet => !HasOutputPreview;
 
-    // Error badge
+    // Error badge — first 120 chars, truncated with ellipsis
     public bool HasError => !string.IsNullOrEmpty(_runner.LastError);
-    public string ErrorText => _runner.LastError ?? "";
+    public string ErrorText
+    {
+        get
+        {
+            var err = _runner.LastError ?? "";
+            if (!_errorExpanded && err.Length > 120)
+                return err[..120] + "...";
+            return err;
+        }
+    }
     public int ErrorMaxLines => _errorExpanded ? 20 : 2;
 
     public ICommand ViewLogCommand    { get; }
@@ -79,11 +92,16 @@ public sealed class AgentCardViewModel : INotifyPropertyChanged
         ToggleErrorCommand = new Command(() =>
         {
             _errorExpanded = !_errorExpanded;
+            OnPropertyChanged(nameof(ErrorText));
             OnPropertyChanged(nameof(ErrorMaxLines));
         });
         LoadOutputPreview();
     }
 
+    /// <summary>
+    /// Starts a 5-second polling timer for status and a smooth pulse animation
+    /// for the running state dot.
+    /// </summary>
     public void StartPolling(IDispatcher dispatcher)
     {
         _timer          = dispatcher.CreateTimer();
@@ -99,10 +117,17 @@ public sealed class AgentCardViewModel : INotifyPropertyChanged
         var prevStatus = Status;
         Status = _runner.Status;
 
-        // Pulse animation for running status
-        _statusDotOpacity = Status == AgentStatus.Running
-            ? (DateTime.UtcNow.Second % 2 == 0 ? 1.0 : 0.4)
-            : 1.0;
+        // Pulse animation for running status: toggle between 1.0 and 0.3
+        if (Status == AgentStatus.Running)
+        {
+            _pulseHigh = !_pulseHigh;
+            _statusDotOpacity = _pulseHigh ? 1.0 : 0.3;
+        }
+        else
+        {
+            _statusDotOpacity = 1.0;
+            _pulseHigh = true;
+        }
 
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(StatusColor));
@@ -114,6 +139,7 @@ public sealed class AgentCardViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(TokenUsageText));
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(ErrorText));
+        OnPropertyChanged(nameof(ShowNoOutputYet));
 
         // Refresh output preview after a run completes and fire notifications
         if (prevStatus == AgentStatus.Running && Status != AgentStatus.Running)
@@ -121,6 +147,7 @@ public sealed class AgentCardViewModel : INotifyPropertyChanged
             LoadOutputPreview();
             OnPropertyChanged(nameof(OutputPreview));
             OnPropertyChanged(nameof(HasOutputPreview));
+            OnPropertyChanged(nameof(ShowNoOutputYet));
 
             // System tray notifications
             if (Status == AgentStatus.Error)
@@ -134,21 +161,53 @@ public sealed class AgentCardViewModel : INotifyPropertyChanged
     {
         try
         {
-            // Look for the most recent output file (not run.log)
             if (!Directory.Exists(OutputPath)) return;
-            var files = Directory.GetFiles(OutputPath)
+            var file = Directory.GetFiles(OutputPath)
                 .Where(f => !f.EndsWith("run.log") && !f.EndsWith("run.jsonl"))
                 .OrderByDescending(File.GetLastWriteTimeUtc)
                 .FirstOrDefault();
-            if (files is null) return;
+            if (file is null) return;
 
-            var lines = File.ReadLines(files).TakeLast(2).ToArray();
-            OutputPreview = string.Join(Environment.NewLine, lines);
+            var text = File.ReadAllText(file);
+            if (text.Length > 100)
+                text = text[..100] + "...";
+            OutputPreview = text.ReplaceLineEndings(" ");
         }
         catch
         {
             // Best-effort preview
         }
+    }
+
+    /// <summary>
+    /// Formats a DateTime as a human-readable relative string.
+    /// </summary>
+    internal static string FormatRelativeTime(DateTime? utcTime)
+    {
+        if (utcTime is null) return "Never";
+
+        var now = DateTime.UtcNow;
+        var elapsed = now - utcTime.Value;
+
+        if (elapsed.TotalSeconds < 60)
+            return "Just now";
+        if (elapsed.TotalMinutes < 2)
+            return "1 minute ago";
+        if (elapsed.TotalMinutes < 60)
+            return $"{(int)elapsed.TotalMinutes} minutes ago";
+        if (elapsed.TotalHours < 2)
+            return "1 hour ago";
+        if (elapsed.TotalHours < 24)
+            return $"{(int)elapsed.TotalHours} hours ago";
+
+        // Same calendar day in local time
+        var local = utcTime.Value.ToLocalTime();
+        if (local.Date == DateTime.Now.Date)
+            return $"Today {local:h:mm tt}";
+        if (local.Date == DateTime.Now.Date.AddDays(-1))
+            return $"Yesterday {local:h:mm tt}";
+
+        return local.ToString("MMM d, h:mm tt");
     }
 
     private void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? name = null)
