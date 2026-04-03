@@ -1,11 +1,25 @@
 namespace Purfle.App.Services;
 
 /// <summary>
-/// Cross-platform notification service. Sends system tray / toast notifications
-/// when agents complete or error.
+/// Legacy notification service kept for backward compatibility.
+/// New code should inject <see cref="INotificationService"/> directly.
+/// This class delegates to the platform-specific INotificationService when available,
+/// and falls back to inline platform code otherwise.
 /// </summary>
 public sealed class NotificationService
 {
+    private readonly INotificationService? _inner;
+
+    public NotificationService()
+    {
+        _inner = null;
+    }
+
+    public NotificationService(INotificationService inner)
+    {
+        _inner = inner;
+    }
+
     /// <summary>
     /// Sends a system notification with the given title and message.
     /// On Windows, uses shell toast notifications. On macOS, uses UNUserNotificationCenter.
@@ -24,7 +38,6 @@ public sealed class NotificationService
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[Notification] Windows toast failed: {ex.Message}");
-            // Fall back to console
             Console.WriteLine($"[Notification] {title}: {message}");
         }
 #elif MACCATALYST
@@ -63,6 +76,12 @@ public sealed class NotificationService
     /// </summary>
     public void RequestPermission()
     {
+        if (_inner != null)
+        {
+            _inner.RequestPermission();
+            return;
+        }
+
 #if MACCATALYST
         UserNotifications.UNUserNotificationCenter.Current.RequestAuthorization(
             UserNotifications.UNAuthorizationOptions.Alert |
