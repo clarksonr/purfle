@@ -88,7 +88,7 @@ describe("validateManifest", () => {
       },
       lifecycle: { on_error: "terminate" },
       tools: [{ name: "search", server: "http://localhost:9000" }],
-      io: { anything: "goes" },
+      io: { reads: ["11111111-1111-4111-a111-111111111111"] },
     };
     const result = validateManifest(m);
     assert.ok(result.valid, `errors: ${result.errors.join(", ")}`);

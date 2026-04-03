@@ -14,6 +14,11 @@ import { securityScanCommand } from "./commands/security-scan.js";
 import { packCommand } from "./commands/pack.js";
 import { setupCommand } from "./commands/setup.js";
 import { demoCommand } from "./commands/demo.js";
+import { statusCommand } from "./commands/status.js";
+import { logsCommand } from "./commands/logs.js";
+import { uninstallCommand } from "./commands/uninstall.js";
+import { updateCommand } from "./commands/update.js";
+import { doctorCommand } from "./commands/doctor.js";
 
 const program = new Command();
 
@@ -144,6 +149,46 @@ program
   .description("Start local MCP servers for development and demo")
   .action(async () => {
     await demoCommand();
+  });
+
+program
+  .command("status")
+  .description("Show status of all installed agents")
+  .action(async () => {
+    await statusCommand();
+  });
+
+program
+  .command("logs <agent-id>")
+  .description("View logs for an installed agent")
+  .option("--tail <n>", "number of lines to show (default 50)")
+  .option("--follow", "stream new log lines as they appear")
+  .action(async (agentId: string, options: { tail?: string; follow?: boolean }) => {
+    await logsCommand(agentId, options);
+  });
+
+program
+  .command("uninstall <agent-id>")
+  .description("Uninstall an agent and remove its data")
+  .option("--keep-output", "keep agent output files")
+  .option("--yes", "skip confirmation prompt")
+  .action(async (agentId: string, options: { keepOutput?: boolean; yes?: boolean }) => {
+    await uninstallCommand(agentId, options);
+  });
+
+program
+  .command("update [agent-id]")
+  .description("Check for and apply agent updates from the marketplace")
+  .option("--registry <url>", "marketplace API URL")
+  .action(async (agentId: string | undefined, options: { registry?: string }) => {
+    await updateCommand(agentId, options);
+  });
+
+program
+  .command("doctor")
+  .description("Run diagnostics on your Purfle environment")
+  .action(async () => {
+    await doctorCommand();
   });
 
 program.parse(process.argv);
