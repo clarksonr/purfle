@@ -8,7 +8,7 @@ public sealed class NotificationService
 {
     /// <summary>
     /// Sends a system notification with the given title and message.
-    /// On Windows, uses shell toast notifications. On macOS, uses UserNotifications.
+    /// On Windows, uses shell toast notifications. On macOS, uses UNUserNotificationCenter.
     /// </summary>
     public void Notify(string title, string message)
     {
@@ -27,9 +27,51 @@ public sealed class NotificationService
             // Fall back to console
             Console.WriteLine($"[Notification] {title}: {message}");
         }
+#elif MACCATALYST
+        try
+        {
+            var content = new UserNotifications.UNMutableNotificationContent
+            {
+                Title = title,
+                Body = message,
+                Sound = UserNotifications.UNNotificationSound.Default
+            };
+
+            var trigger = UserNotifications.UNTimeIntervalNotificationTrigger.CreateTrigger(1, false);
+            var request = UserNotifications.UNNotificationRequest.FromIdentifier(
+                Guid.NewGuid().ToString(), content, trigger);
+
+            UserNotifications.UNUserNotificationCenter.Current.AddNotificationRequest(request, error =>
+            {
+                if (error != null)
+                    System.Diagnostics.Debug.WriteLine($"[Notification] macOS notification error: {error.LocalizedDescription}");
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[Notification] macOS notification failed: {ex.Message}");
+            Console.WriteLine($"[Notification] {title}: {message}");
+        }
 #else
         // Fallback for unsupported platforms
         System.Diagnostics.Debug.WriteLine($"[Notification] {title}: {message}");
+#endif
+    }
+
+    /// <summary>
+    /// Request notification permission on macOS. Call once at app startup.
+    /// </summary>
+    public void RequestPermission()
+    {
+#if MACCATALYST
+        UserNotifications.UNUserNotificationCenter.Current.RequestAuthorization(
+            UserNotifications.UNAuthorizationOptions.Alert |
+            UserNotifications.UNAuthorizationOptions.Sound,
+            (granted, error) =>
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[Notification] macOS permission: granted={granted}, error={error?.LocalizedDescription}");
+            });
 #endif
     }
 
