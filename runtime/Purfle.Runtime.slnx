@@ -12,4 +12,5 @@
     <Project Path="tests/Purfle.TestAgents.Hello/Purfle.TestAgents.Hello.csproj" />
   </Folder>
   <Project Path="../sdk/dotnet/Purfle.Sdk/Purfle.Sdk.csproj" />
+  <Project Path="../identityhub/src/Purfle.IdentityHub.Web/Purfle.IdentityHub.Web.csproj" />
 </Solution>
