@@ -175,7 +175,9 @@ my-agent.purfle/
   "tools": [
     { "name": "<string>", "server": "<mcp server url>", "description": "<string>" }
   ],
-  "io": {}
+  "io": {
+    "reads": ["<agent-id-uuid>"]
+  }
 }
 ```
 
@@ -197,6 +199,7 @@ my-agent.purfle/
 | `fs.read` | `paths: string[]` | Read from listed paths |
 | `fs.write` | `paths: string[]` | Write to listed paths |
 | `mcp.tool` | none | Invoke MCP tools declared in `tools` |
+| `agent.read` | none | Read output files from agents declared in io.reads |
 | `hardware.*.*` | `asset_id, window_start, window_end, commands[]` | RFC 0002 hardware access — future |
 
 ### Schedule trigger types
@@ -237,6 +240,7 @@ my-agent.purfle/
 | Tests | xUnit + Jest |
 | macOS credentials | Keychain via SecureStorage |
 | macOS notifications | UNUserNotificationCenter |
+| Windows notifications | WinRT toast via INotificationService |
 | macOS signing | Apple Developer — PLACEHOLDER_APPLE_TEAM_ID |
 | Windows signing | Code signing cert (WINDOWS_CERT_PFX secret) |
 | Azure | Functions consumption + App Service F1 |
@@ -306,14 +310,15 @@ Repeat only if you generate a new key pair.
 - SPEC.md, JSON Schema (Draft 2020-12), identity schema
 - RFC 0001 — identity model (JWS/ES256)
 - RFC 0002 — hardware access model (concept/pre-proposal) `spec/rfcs/0002-hardware-access-model.md`
+- RFC 0003 — cross-agent output sharing (status: Accepted) `spec/rfcs/0003-cross-agent-output-sharing.md`
 - Examples: hello-world, assistant, email-monitor, demo-agent, window-agent, event-agent
 - AGENT_MODEL.md
 
-**Runtime — 139 passing tests**
+**Runtime — 152 unit tests + 11 integration tests**
 - AgentLoader (7-step), ManifestLoader/Validator, IdentityVerifier, JWS ES256
 - IKeyRegistry, HttpKeyRegistryClient
 - CapabilityNegotiator, AgentSandbox (network/fs/env/MCP)
-- LoadFailureReason (13 reasons), BuiltInToolExecutor, ConversationSession
+- LoadFailureReason (14 reasons incl. InvalidCrossAgentReference), BuiltInToolExecutor, ConversationSession
 - GeminiAdapter, AnthropicAdapter, OpenClawAdapter, OllamaAdapter (backoff, token usage)
 - ProcessAgentRunner, CredentialStoreFactory (Win/Mac/Linux/InMemory)
 - Scheduler: interval, cron, startup, window, event — overlap skip, crash isolation
@@ -323,27 +328,42 @@ Repeat only if you generate a new key pair.
 - **SseEventSourceFactory** — DI-ready factory for production event sources
 - AgentRunner (run.jsonl + run.log), AgentAssemblyLoadContext, McpClient
 - Purfle.TestAgents.Hello
+- **IAgentOutputReader + AgentSandboxedOutputReader** — cross-agent output sharing via io.reads
+- **agent.read capability** — declares cross-agent read access (no permissions config)
+- **ITokenUsageTracker + FileTokenUsageTracker** — usage.jsonl per agent, append-only, thread-safe
 
 **Key Registry** — deployed, trust loop verified
 - Signing key: com.clarksonr/release-2026 (2026-04-02)
 - Private key: temp-agent/signing.key.pem — DO NOT COMMIT
 - Public key NOT YET registered in Azure — run purfle setup locally
 
-**SDK & CLI** — 49 core + 17 CLI tests
+**SDK & CLI** — 73 tests (49 core + 17 CLI + 7 operational)
 - init, build, sign, simulate (--trigger window_open/event), publish, search, install, login,
   validate, run, security-scan, pack (SHA-256 sidecar), setup (GitHub token check), demo
+- **purfle status** — agent roster table with trigger, last run, next run, status (color-coded)
+- **purfle logs** `<agent-id>` `[--tail N]` `[--follow]` — view agent run.log with streaming
+- **purfle uninstall** `<agent-id>` `[--keep-output]` `[--yes]` — remove agent and output
+- **purfle update** `[<agent-id>]` — Marketplace version check, SHA-256 verify, signature verify, reinstall
+- **purfle doctor** — 12-item environment checklist with color-coded output (✓/✗/⚠)
 - **purfle demo** — color-coded banner, server summary table, next-steps block
 - Bundle SHA-256 integrity: pack writes .sha256, install verifies hash on download
 
 **Desktop App**
 - **DashboardPage** — default landing tab with summary bar, today's digest, agent roster
-- SetupWizardPage (4-step), ConsentPage, AgentDetailPage (6-tab incl. Install)
+- SetupWizardPage (4-step), ConsentPage, AgentDetailPage (7-tab: Overview, Permissions, Files, History, System.md, Usage, Install)
+- **RunHistoryPage** — virtualized run list, All/Success/Error filter, load-more pagination (50/page)
+- **RunDetailPage** — full output display, error detail section, token usage, Retry action, Open output folder
 - **AgentCard live state** — pulse animation, relative timestamps, 100-char output preview,
   120-char error truncation, "No output yet" placeholder
 - **Marketplace install flow** — Install tab fetches agent metadata, streams CLI output live,
   success/error banners, offline handling
-- AgentCard, LogViewPage, AgentRunPage, SettingsPage
-- purfle:// deep link (Windows + macOS), UNUserNotificationCenter (macOS)
+- **INotificationService** + MacNotificationService + WindowsNotificationService (WinRT toast) + NullNotificationService
+- **Settings page** — API key management via SecureStorage (Gemini/Anthropic/OpenAI with status dots), Ollama URL + test,
+  output dir with Open in Explorer/Finder, log retention (7/14/30/90 days), notification prefs (master + 3 sub-toggles),
+  About section with version/runtime/platform + Copy Diagnostic Info
+- **Token usage tab** in AgentDetailPage — per-agent usage.jsonl viewer with cost estimates
+- AgentCard, LogViewPage, AgentRunPage
+- purfle:// deep link (Windows + macOS)
 - Entitlements.plist, CFBundleURLTypes, code signing config in csproj
 
 **Polyglot Agents** — 10 agents (C# + TypeScript, IPC)
@@ -362,19 +382,30 @@ Repeat only if you generate a new key pair.
 
 **Dogfood Agents** — email-monitor, pr-watcher, report-builder, file-assistant (signed)
 - **report-builder** — rich Markdown digest with tables (displays in Dashboard digest)
+- report-builder now reads email-monitor and pr-watcher via IAgentOutputReader (io.reads wired)
 
 **Infrastructure** — infra/marketplace.bicep + infra/identityhub-web.bicep
 
 **CI/CD** — ci.yml (matrix + macOS), release.yml (MSIX + .pkg + notarization + Azure deploy)
 
 **Docs** — GETTING_STARTED, MANIFEST_REFERENCE, PUBLISHING, TROUBLESHOOTING, ROADMAP
+- CONTRIBUTING.md — contributor guide with prerequisites, build, test, branching, commit conventions
+- docs/AGENT_AUTHORING.md — complete walkthrough from zero to published agent
+
+**Integration Tests** — Purfle.IntegrationTests (11 tests)
+- AgentLifecycleTest — load + run + verify output
+- SandboxEnforcementTests — fs.write, env.read, network, capability negotiation
+- MultiAgentIsolationTest — concurrent agents write to isolated directories
+- CrossAgentReadIntegrationTest — reader reads writer output via IAgentOutputReader
+- SignatureTamperingTest — tampered manifest fails verification
+- TokenUsageAccumulationTest — two runs accumulate in usage.jsonl
+- ExpiredManifestTest — expired identity rejected at load time
 
 **README.md** — public-facing project README with architecture, features, quick start, agent model
 
 ### What does NOT exist yet (priority order)
 1. Register signing public key — one-time local action (see Key Registration above)
-2. Azure deployment — needs AZURE_CREDENTIALS secret then tag push triggers it
-3. Cross-agent output sharing (deferred)
+2. Azure deployment — needs AZURE_CREDENTIALS secret, then tag push triggers release.yml
 
 ---
 
