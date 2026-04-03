@@ -12,6 +12,7 @@ import { validateCommand } from "./commands/validate.js";
 import { runCommand } from "./commands/run.js";
 import { securityScanCommand } from "./commands/security-scan.js";
 import { packCommand } from "./commands/pack.js";
+import { setupCommand } from "./commands/setup.js";
 
 const program = new Command();
 
@@ -124,6 +125,13 @@ program
   .option("-v, --verbose", "show extra detail")
   .action((dir: string = ".", options: { publicKey?: string; verbose?: boolean }) => {
     securityScanCommand(dir, options);
+  });
+
+program
+  .command("setup")
+  .description("Check your development environment and configure Purfle")
+  .action(async () => {
+    await setupCommand();
   });
 
 program.parse(process.argv);
