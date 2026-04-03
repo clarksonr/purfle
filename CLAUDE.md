@@ -164,6 +164,7 @@ my-agent.purfle/
   "runtime": {
     "requires": "purfle/0.1",
     "engine":   "gemini | anthropic | openai | ollama",
+    "engine_fallback": ["anthropic", "openai"],
     "model":    "<model string for chosen engine>",
     "max_tokens": 1000
   },
@@ -314,13 +315,16 @@ Repeat only if you generate a new key pair.
 - Examples: hello-world, assistant, email-monitor, demo-agent, window-agent, event-agent
 - AGENT_MODEL.md
 
-**Runtime — 152 unit tests + 11 integration tests**
+**Runtime — 169 unit tests + 11 integration tests**
 - AgentLoader (7-step), ManifestLoader/Validator, IdentityVerifier, JWS ES256
 - IKeyRegistry, HttpKeyRegistryClient
 - CapabilityNegotiator, AgentSandbox (network/fs/env/MCP)
 - LoadFailureReason (14 reasons incl. InvalidCrossAgentReference), BuiltInToolExecutor, ConversationSession
-- GeminiAdapter, AnthropicAdapter, OpenClawAdapter, OllamaAdapter (backoff, token usage)
+- GeminiAdapter, AnthropicAdapter, OpenClawAdapter, OllamaAdapter (backoff, token usage, ResolvedCredential)
 - ProcessAgentRunner, CredentialStoreFactory (Win/Mac/Linux/InMemory)
+- **Multi-provider auth** — AuthProfileStore (file + keychain), CredentialResolutionEngine (fallback cascade),
+  UserProviderPreferences, ICredentialResolver, env var seeding, 22 auth tests
+- **engine_fallback** — manifest field for ordered engine fallback list
 - Scheduler: interval, cron, startup, window, event — overlap skip, crash isolation
 - WindowTrigger: window_open, window_close, interval_within (ISO 8601 + cron windows)
 - EventTrigger: IEventSource/IEventSourceFactory, queue depth 1, drop on full
@@ -361,6 +365,8 @@ Repeat only if you generate a new key pair.
 - **Settings page** — API key management via SecureStorage (Gemini/Anthropic/OpenAI with status dots), Ollama URL + test,
   output dir with Open in Explorer/Finder, log retention (7/14/30/90 days), notification prefs (master + 3 sub-toggles),
   About section with version/runtime/platform + Copy Diagnostic Info
+- **Connected Accounts section** — multi-provider auth profiles with status dots, drag-to-reorder priority,
+  add/remove API key, ConnectedAccountsViewModel, provider preference persistence
 - **Token usage tab** in AgentDetailPage — per-agent usage.jsonl viewer with cost estimates
 - AgentCard, LogViewPage, AgentRunPage
 - purfle:// deep link (Windows + macOS)
