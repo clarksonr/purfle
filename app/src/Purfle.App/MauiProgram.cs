@@ -19,6 +19,15 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
+        // Notification service — platform-specific
+#if WINDOWS
+        builder.Services.AddSingleton<INotificationService, WindowsNotificationService>();
+#elif MACCATALYST
+        builder.Services.AddSingleton<INotificationService, MacNotificationService>();
+#else
+        builder.Services.AddSingleton<INotificationService, NullNotificationService>();
+#endif
+
         // Services
         builder.Services.AddSingleton<MarketplaceService>();
         builder.Services.AddSingleton<AgentStore>();
@@ -85,6 +94,8 @@ public static class MauiProgram
         builder.Services.AddTransient<LogViewPage>();
         builder.Services.AddTransient<SetupWizardPage>();
         builder.Services.AddTransient<ConsentPage>();
+        builder.Services.AddTransient<RunHistoryPage>();
+        builder.Services.AddTransient<RunDetailPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

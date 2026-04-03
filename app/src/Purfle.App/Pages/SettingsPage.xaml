@@ -7,10 +7,173 @@
     <ScrollView Padding="16">
         <VerticalStackLayout Spacing="16">
 
-            <!-- Stats section -->
-            <Label Text="Agent Statistics"
-                   FontSize="14"
+            <!-- API Keys section -->
+            <Label Text="API Keys"
+                   FontSize="16"
                    FontAttributes="Bold" />
+            <Label Text="Stored securely in the platform credential manager."
+                   TextColor="Gray" FontSize="12" />
+
+            <!-- Gemini -->
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                <BoxView x:Name="GeminiDot" WidthRequest="10" HeightRequest="10" CornerRadius="5"
+                         Color="Red" VerticalOptions="Center" />
+                <Entry x:Name="GeminiKeyEntry" Grid.Column="1" Placeholder="GEMINI_API_KEY"
+                       IsPassword="True" Keyboard="Default" />
+                <Button x:Name="GeminiShowBtn" Grid.Column="2" Text="Show"
+                        Clicked="OnToggleGeminiVisibility"
+                        BackgroundColor="Transparent" TextColor="#5B5EA6"
+                        FontSize="11" Padding="8,2" />
+                <Button Grid.Column="3" Text="Save"
+                        Clicked="OnSaveGeminiKey"
+                        BackgroundColor="#1a1a2e" TextColor="White"
+                        FontSize="11" Padding="12,2" />
+            </Grid>
+            <Label Text="Google Gemini" FontSize="11" TextColor="Gray" Margin="20,0,0,0" />
+
+            <!-- Anthropic -->
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                <BoxView x:Name="AnthropicDot" WidthRequest="10" HeightRequest="10" CornerRadius="5"
+                         Color="Red" VerticalOptions="Center" />
+                <Entry x:Name="AnthropicKeyEntry" Grid.Column="1" Placeholder="ANTHROPIC_API_KEY"
+                       IsPassword="True" Keyboard="Default" />
+                <Button x:Name="AnthropicShowBtn" Grid.Column="2" Text="Show"
+                        Clicked="OnToggleAnthropicVisibility"
+                        BackgroundColor="Transparent" TextColor="#5B5EA6"
+                        FontSize="11" Padding="8,2" />
+                <Button Grid.Column="3" Text="Save"
+                        Clicked="OnSaveAnthropicKey"
+                        BackgroundColor="#1a1a2e" TextColor="White"
+                        FontSize="11" Padding="12,2" />
+            </Grid>
+            <Label Text="Anthropic" FontSize="11" TextColor="Gray" Margin="20,0,0,0" />
+
+            <!-- OpenAI -->
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                <BoxView x:Name="OpenAIDot" WidthRequest="10" HeightRequest="10" CornerRadius="5"
+                         Color="Red" VerticalOptions="Center" />
+                <Entry x:Name="OpenAIKeyEntry" Grid.Column="1" Placeholder="OPENAI_API_KEY"
+                       IsPassword="True" Keyboard="Default" />
+                <Button x:Name="OpenAIShowBtn" Grid.Column="2" Text="Show"
+                        Clicked="OnToggleOpenAIVisibility"
+                        BackgroundColor="Transparent" TextColor="#5B5EA6"
+                        FontSize="11" Padding="8,2" />
+                <Button Grid.Column="3" Text="Save"
+                        Clicked="OnSaveOpenAIKey"
+                        BackgroundColor="#1a1a2e" TextColor="White"
+                        FontSize="11" Padding="12,2" />
+            </Grid>
+            <Label Text="OpenAI" FontSize="11" TextColor="Gray" Margin="20,0,0,0" />
+
+            <!-- Ollama -->
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                <BoxView x:Name="OllamaDot" WidthRequest="10" HeightRequest="10" CornerRadius="5"
+                         Color="Gray" VerticalOptions="Center" />
+                <Entry x:Name="OllamaUrlEntry" Grid.Column="1"
+                       Placeholder="http://localhost:11434" Keyboard="Url" />
+                <Button Grid.Column="2" Text="Test"
+                        Clicked="OnTestOllama"
+                        BackgroundColor="Transparent" TextColor="#5B5EA6"
+                        FontSize="11" Padding="12,2" />
+            </Grid>
+            <Label Text="Ollama (local)" FontSize="11" TextColor="Gray" Margin="20,0,0,0" />
+
+            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
+
+            <!-- Output section -->
+            <Label Text="Output"
+                   FontSize="16"
+                   FontAttributes="Bold" />
+            <Label x:Name="OutputPathLabel" FontSize="13" TextColor="Gray" />
+            <HorizontalStackLayout Spacing="8">
+                <Button Text="Open in Explorer / Finder"
+                        Clicked="OnOpenOutputFolder"
+                        BackgroundColor="#1a1a2e" TextColor="White"
+                        FontSize="12" Padding="12,4" />
+            </HorizontalStackLayout>
+
+            <Label Text="Log Retention" FontSize="13" FontAttributes="Bold" Margin="0,8,0,0" />
+            <Picker x:Name="RetentionPicker">
+                <Picker.Items>
+                    <x:String>7 days</x:String>
+                    <x:String>14 days</x:String>
+                    <x:String>30 days</x:String>
+                    <x:String>90 days</x:String>
+                </Picker.Items>
+            </Picker>
+            <Button Text="Save Retention"
+                    Clicked="OnSaveRetention"
+                    BackgroundColor="#1a1a2e" TextColor="White"
+                    FontSize="12" Padding="12,4" HorizontalOptions="Start" />
+
+            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
+
+            <!-- Notifications section -->
+            <Label Text="Notifications"
+                   FontSize="16"
+                   FontAttributes="Bold" />
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+                <Label Text="Enable notifications" VerticalOptions="Center" FontSize="13" />
+                <Switch x:Name="NotifyMasterSwitch" Grid.Column="1"
+                        Toggled="OnNotifyMasterToggled" />
+
+                <Label Grid.Row="1" Text="Agent success" VerticalOptions="Center" FontSize="13" />
+                <Switch x:Name="NotifySuccessSwitch" Grid.Row="1" Grid.Column="1" />
+
+                <Label Grid.Row="2" Text="Agent error" VerticalOptions="Center" FontSize="13" />
+                <Switch x:Name="NotifyErrorSwitch" Grid.Row="2" Grid.Column="1" />
+
+                <Label Grid.Row="3" Text="Installation events" VerticalOptions="Center" FontSize="13" />
+                <Switch x:Name="NotifyInstallSwitch" Grid.Row="3" Grid.Column="1" />
+            </Grid>
+
+            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
+
+            <!-- Marketplace URL -->
+            <Label Text="Marketplace"
+                   FontSize="16"
+                   FontAttributes="Bold" />
+            <Entry x:Name="RegistryUrlEntry"
+                   Placeholder="http://localhost:5000"
+                   Keyboard="Url" />
+            <Button Text="Save URL"
+                    Clicked="OnSaveUrl"
+                    BackgroundColor="#1a1a2e" TextColor="White"
+                    FontSize="12" Padding="12,4" HorizontalOptions="Start" />
+
+            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
+
+            <!-- Data Management -->
+            <Label Text="Data Management"
+                   FontSize="16"
+                   FontAttributes="Bold" />
+            <Button Text="Clear All Agent Output"
+                    Clicked="OnClearOutput"
+                    BackgroundColor="#CC0000" TextColor="White"
+                    FontSize="12" Padding="12,4" HorizontalOptions="Start" />
+            <Button Text="Reset Setup Wizard"
+                    Clicked="OnResetSetup"
+                    BackgroundColor="#CC0000" TextColor="White"
+                    FontSize="12" Padding="12,4" HorizontalOptions="Start" />
+
+            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
+
+            <!-- About section -->
+            <Label Text="About"
+                   FontSize="16"
+                   FontAttributes="Bold" />
+            <Label x:Name="AppVersionLabel" FontSize="13" TextColor="Gray" />
+            <Label x:Name="RuntimeVersionLabel" FontSize="13" TextColor="Gray" />
+            <Label x:Name="PlatformLabel" FontSize="13" TextColor="Gray" />
+
+            <HorizontalStackLayout Spacing="12" Margin="0,8">
+                <Button Text="Copy Diagnostic Info"
+                        Clicked="OnCopyDiagnostics"
+                        BackgroundColor="#1a1a2e" TextColor="White"
+                        FontSize="12" Padding="12,4" />
+            </HorizontalStackLayout>
+
+            <!-- Stats section -->
             <Label x:Name="StatsLabel"
                    Text="Loading..."
                    FontSize="13"
@@ -18,107 +181,7 @@
 
             <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
 
-            <Label Text="Marketplace URL"
-                   FontSize="14"
-                   FontAttributes="Bold" />
-            <Entry x:Name="RegistryUrlEntry"
-                   Placeholder="http://localhost:5000"
-                   Keyboard="Url" />
-            <Button Text="Save"
-                    Clicked="OnSaveUrl"
-                    BackgroundColor="#1a1a2e"
-                    TextColor="White" />
-
-            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
-
-            <Label Text="Local Development"
-                   FontSize="14"
-                   FontAttributes="Bold" />
-            <Label Text="Install a .purfle bundle from a local file (bypasses marketplace)."
-                   TextColor="Gray"
-                   FontSize="13" />
-            <Button Text="Install Bundle from File…"
-                    Clicked="OnInstallBundle"
-                    BackgroundColor="#5B5EA6"
-                    TextColor="White" />
-
-            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
-
-            <Label Text="Preferred Engine"
-                   FontSize="14"
-                   FontAttributes="Bold" />
-            <Label Text="Overrides the engine declared in each agent's manifest."
-                   TextColor="Gray"
-                   FontSize="13" />
-            <Picker x:Name="EnginePicker">
-                <Picker.Items>
-                    <x:String>Use agent default</x:String>
-                    <x:String>Anthropic</x:String>
-                    <x:String>Google Gemini</x:String>
-                </Picker.Items>
-            </Picker>
-            <Button Text="Save Engine Preference"
-                    Clicked="OnSaveEngine"
-                    BackgroundColor="#1a1a2e"
-                    TextColor="White" />
-
-            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
-
-            <Label Text="API Keys"
-                   FontSize="14"
-                   FontAttributes="Bold" />
-            <Label Text="Anthropic"
-                   TextColor="Gray"
-                   FontSize="13" />
-            <Entry x:Name="AnthropicKeyEntry"
-                   Placeholder="sk-ant-..."
-                   IsPassword="True" />
-            <Label Text="Google Gemini"
-                   TextColor="Gray"
-                   FontSize="13" />
-            <Entry x:Name="GeminiKeyEntry"
-                   Placeholder="AIza..."
-                   IsPassword="True" />
-            <HorizontalStackLayout Spacing="8">
-                <Button Text="Save API Keys"
-                        Clicked="OnSaveApiKeys"
-                        BackgroundColor="#1a1a2e"
-                        TextColor="White" />
-                <Button Text="Test Connection"
-                        Clicked="OnTestConnection"
-                        BackgroundColor="Transparent"
-                        TextColor="#5B5EA6" />
-            </HorizontalStackLayout>
-            <Label x:Name="TestConnectionLabel"
-                   Text=""
-                   FontSize="12" />
-
-            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
-
-            <!-- Clear output -->
-            <Label Text="Data Management"
-                   FontSize="14"
-                   FontAttributes="Bold" />
-            <Button Text="Clear All Agent Output"
-                    Clicked="OnClearOutput"
-                    BackgroundColor="#CC0000"
-                    TextColor="White" />
-
-            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
-
-            <Label Text="Setup Wizard"
-                   FontSize="14"
-                   FontAttributes="Bold" />
-            <Label Text="Re-run the first-time setup wizard."
-                   TextColor="Gray"
-                   FontSize="13" />
-            <Button Text="Reset Setup"
-                    Clicked="OnResetSetup"
-                    BackgroundColor="#CC0000"
-                    TextColor="White" />
-
-            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
-
+            <!-- Authentication -->
             <Label Text="Authentication"
                    FontSize="14"
                    FontAttributes="Bold" />
@@ -129,7 +192,8 @@
                     Text="Login"
                     Clicked="OnLogin"
                     BackgroundColor="#1a1a2e"
-                    TextColor="White" />
+                    TextColor="White"
+                    FontSize="12" Padding="12,4" HorizontalOptions="Start" />
 
         </VerticalStackLayout>
     </ScrollView>

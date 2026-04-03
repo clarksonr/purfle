@@ -1,3 +1,4 @@
+using System.Reflection;
 using Purfle.App.Services;
 
 namespace Purfle.App.Pages;
@@ -6,6 +7,10 @@ public partial class SettingsPage : ContentPage
 {
     private readonly MarketplaceService _marketplace;
     private readonly AgentStore _store;
+
+    private static readonly string s_outputBase = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "aivm", "output");
 
     public SettingsPage(MarketplaceService marketplace, AgentStore store)
     {
@@ -18,60 +23,121 @@ public partial class SettingsPage : ContentPage
     {
         base.OnAppearing();
         LoadStats();
+        await LoadApiKeyIndicators();
+        LoadOutputSection();
+        LoadNotificationPrefs();
+        LoadAboutSection();
         RegistryUrlEntry.Text = _marketplace.BaseUrl;
-        var anthropicKey = await SecureStorage.GetAsync("anthropic_api_key");
-        if (!string.IsNullOrEmpty(anthropicKey))
-            AnthropicKeyEntry.Text = anthropicKey;
-
-        var geminiKey = await SecureStorage.GetAsync("gemini_api_key");
-        if (!string.IsNullOrEmpty(geminiKey))
-            GeminiKeyEntry.Text = geminiKey;
-
-        EnginePicker.SelectedIndex = Preferences.Get("preferred_engine", "") switch
-        {
-            "anthropic" => 1,
-            "gemini"    => 2,
-            _           => 0,
-        };
-
+        OllamaUrlEntry.Text = Preferences.Get("ollama_base_url", "http://localhost:11434");
         UpdateAuthStatus();
     }
 
-    private async void OnInstallBundle(object? sender, EventArgs e)
+    // --- API Keys ---
+
+    private async Task LoadApiKeyIndicators()
     {
+        var gemini = await SecureStorage.GetAsync("gemini_api_key");
+        GeminiDot.Color = string.IsNullOrEmpty(gemini) ? Colors.Red : Colors.Green;
+        if (!string.IsNullOrEmpty(gemini)) GeminiKeyEntry.Text = gemini;
+
+        var anthropic = await SecureStorage.GetAsync("anthropic_api_key");
+        AnthropicDot.Color = string.IsNullOrEmpty(anthropic) ? Colors.Red : Colors.Green;
+        if (!string.IsNullOrEmpty(anthropic)) AnthropicKeyEntry.Text = anthropic;
+
+        var openai = await SecureStorage.GetAsync("openai_api_key");
+        OpenAIDot.Color = string.IsNullOrEmpty(openai) ? Colors.Red : Colors.Green;
+        if (!string.IsNullOrEmpty(openai)) OpenAIKeyEntry.Text = openai;
+    }
+
+    private async void OnSaveGeminiKey(object? sender, EventArgs e)
+    {
+        var key = GeminiKeyEntry.Text?.Trim() ?? "";
+        if (string.IsNullOrEmpty(key))
+            SecureStorage.Remove("gemini_api_key");
+        else
+            await SecureStorage.SetAsync("gemini_api_key", key);
+        Environment.SetEnvironmentVariable("GEMINI_API_KEY", string.IsNullOrEmpty(key) ? null : key);
+        GeminiDot.Color = string.IsNullOrEmpty(key) ? Colors.Red : Colors.Green;
+    }
+
+    private async void OnSaveAnthropicKey(object? sender, EventArgs e)
+    {
+        var key = AnthropicKeyEntry.Text?.Trim() ?? "";
+        if (string.IsNullOrEmpty(key))
+            SecureStorage.Remove("anthropic_api_key");
+        else
+            await SecureStorage.SetAsync("anthropic_api_key", key);
+        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", string.IsNullOrEmpty(key) ? null : key);
+        AnthropicDot.Color = string.IsNullOrEmpty(key) ? Colors.Red : Colors.Green;
+    }
+
+    private async void OnSaveOpenAIKey(object? sender, EventArgs e)
+    {
+        var key = OpenAIKeyEntry.Text?.Trim() ?? "";
+        if (string.IsNullOrEmpty(key))
+            SecureStorage.Remove("openai_api_key");
+        else
+            await SecureStorage.SetAsync("openai_api_key", key);
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", string.IsNullOrEmpty(key) ? null : key);
+        OpenAIDot.Color = string.IsNullOrEmpty(key) ? Colors.Red : Colors.Green;
+    }
+
+    private void OnToggleGeminiVisibility(object? sender, EventArgs e)
+    {
+        GeminiKeyEntry.IsPassword = !GeminiKeyEntry.IsPassword;
+        GeminiShowBtn.Text = GeminiKeyEntry.IsPassword ? "Show" : "Hide";
+    }
+
+    private void OnToggleAnthropicVisibility(object? sender, EventArgs e)
+    {
+        AnthropicKeyEntry.IsPassword = !AnthropicKeyEntry.IsPassword;
+        AnthropicShowBtn.Text = AnthropicKeyEntry.IsPassword ? "Show" : "Hide";
+    }
+
+    private void OnToggleOpenAIVisibility(object? sender, EventArgs e)
+    {
+        OpenAIKeyEntry.IsPassword = !OpenAIKeyEntry.IsPassword;
+        OpenAIShowBtn.Text = OpenAIKeyEntry.IsPassword ? "Show" : "Hide";
+    }
+
+    private async void OnTestOllama(object? sender, EventArgs e)
+    {
+        var url = OllamaUrlEntry.Text?.Trim() ?? "http://localhost:11434";
+        Preferences.Set("ollama_base_url", url);
         try
         {
-            var result = await FilePicker.Default.PickAsync(new PickOptions
-            {
-                PickerTitle = "Select a .purfle bundle",
-                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    [DevicePlatform.WinUI] = [".purfle"],
-                    [DevicePlatform.macOS] = ["purfle"],
-                }),
-            });
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var resp = await http.GetAsync($"{url.TrimEnd('/')}/api/tags");
+            OllamaDot.Color = resp.IsSuccessStatusCode ? Colors.Green : Colors.Red;
+        }
+        catch
+        {
+            OllamaDot.Color = Colors.Red;
+        }
+    }
 
-            if (result is null) return;
+    // --- Output section ---
 
-            // Extract the agent ID from the bundle's manifest.
-            string agentId;
-            using (var zip = System.IO.Compression.ZipFile.OpenRead(result.FullPath))
-            {
-                var entry = zip.GetEntry("agent.manifest.json");
-                if (entry is null)
-                {
-                    await DisplayAlertAsync("Error", "Bundle does not contain agent.manifest.json.", "OK");
-                    return;
-                }
+    private void LoadOutputSection()
+    {
+        OutputPathLabel.Text = s_outputBase;
 
-                using var stream = entry.Open();
-                using var doc = await System.Text.Json.JsonDocument.ParseAsync(stream);
-                agentId = doc.RootElement.GetProperty("id").GetString()
-                          ?? throw new InvalidOperationException("Manifest has no 'id' field.");
-            }
+        var retentionDays = Preferences.Get("log_retention_days", 30);
+        RetentionPicker.SelectedIndex = retentionDays switch
+        {
+            7 => 0,
+            14 => 1,
+            90 => 3,
+            _ => 2, // 30
+        };
+    }
 
-            _store.InstallBundle(agentId, result.FullPath);
-            await DisplayAlertAsync("Installed", $"Agent '{agentId}' installed successfully.", "OK");
+    private async void OnOpenOutputFolder(object? sender, EventArgs e)
+    {
+        Directory.CreateDirectory(s_outputBase);
+        try
+        {
+            await Launcher.OpenAsync(new Uri($"file://{s_outputBase}"));
         }
         catch (Exception ex)
         {
@@ -79,38 +145,85 @@ public partial class SettingsPage : ContentPage
         }
     }
 
-    private async void OnSaveEngine(object? sender, EventArgs e)
+    private void OnSaveRetention(object? sender, EventArgs e)
     {
-        var engineKey = EnginePicker.SelectedIndex switch
+        var days = RetentionPicker.SelectedIndex switch
         {
-            1 => "anthropic",
-            2 => "gemini",
-            _ => "",
+            0 => 7,
+            1 => 14,
+            3 => 90,
+            _ => 30,
         };
-        Preferences.Set("preferred_engine", engineKey);
-        await DisplayAlertAsync("Saved", "Engine preference saved.", "OK");
+        Preferences.Set("log_retention_days", days);
     }
 
-    private async void OnSaveApiKeys(object? sender, EventArgs e)
+    // --- Notifications ---
+
+    private void LoadNotificationPrefs()
     {
-        var anthropic = AnthropicKeyEntry.Text?.Trim() ?? "";
-        if (string.IsNullOrEmpty(anthropic))
-            SecureStorage.Remove("anthropic_api_key");
-        else
-            await SecureStorage.SetAsync("anthropic_api_key", anthropic);
-        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY",
-            string.IsNullOrEmpty(anthropic) ? null : anthropic);
+        NotifyMasterSwitch.IsToggled = Preferences.Get("purfle_notifications_enabled", true);
+        NotifySuccessSwitch.IsToggled = Preferences.Get("purfle_notify_success", true);
+        NotifyErrorSwitch.IsToggled = Preferences.Get("purfle_notify_error", true);
+        NotifyInstallSwitch.IsToggled = Preferences.Get("purfle_notify_install", true);
 
-        var gemini = GeminiKeyEntry.Text?.Trim() ?? "";
-        if (string.IsNullOrEmpty(gemini))
-            SecureStorage.Remove("gemini_api_key");
-        else
-            await SecureStorage.SetAsync("gemini_api_key", gemini);
-        Environment.SetEnvironmentVariable("GEMINI_API_KEY",
-            string.IsNullOrEmpty(gemini) ? null : gemini);
+        UpdateNotifySubToggles();
 
-        await DisplayAlertAsync("Saved", "API keys saved.", "OK");
+        NotifyMasterSwitch.Toggled += (_, _) => Preferences.Set("purfle_notifications_enabled", NotifyMasterSwitch.IsToggled);
+        NotifySuccessSwitch.Toggled += (_, _) => Preferences.Set("purfle_notify_success", NotifySuccessSwitch.IsToggled);
+        NotifyErrorSwitch.Toggled += (_, _) => Preferences.Set("purfle_notify_error", NotifyErrorSwitch.IsToggled);
+        NotifyInstallSwitch.Toggled += (_, _) => Preferences.Set("purfle_notify_install", NotifyInstallSwitch.IsToggled);
     }
+
+    private void OnNotifyMasterToggled(object? sender, ToggledEventArgs e)
+    {
+        UpdateNotifySubToggles();
+    }
+
+    private void UpdateNotifySubToggles()
+    {
+        var enabled = NotifyMasterSwitch.IsToggled;
+        NotifySuccessSwitch.IsEnabled = enabled;
+        NotifyErrorSwitch.IsEnabled = enabled;
+        NotifyInstallSwitch.IsEnabled = enabled;
+    }
+
+    // --- About section ---
+
+    private void LoadAboutSection()
+    {
+        var appVersion = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
+        var runtimeVersion = typeof(Purfle.Runtime.AgentLoader).Assembly
+            .GetName().Version?.ToString() ?? "unknown";
+        var platform = $"{DeviceInfo.Platform} {DeviceInfo.VersionString}";
+
+        AppVersionLabel.Text = $"App: {appVersion}";
+        RuntimeVersionLabel.Text = $"Runtime: {runtimeVersion}";
+        PlatformLabel.Text = $"Platform: {platform}";
+    }
+
+    private async void OnCopyDiagnostics(object? sender, EventArgs e)
+    {
+        var appVersion = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "dev";
+        var runtimeVersion = typeof(Purfle.Runtime.AgentLoader).Assembly
+            .GetName().Version?.ToString() ?? "unknown";
+        var installed = _store.ListInstalled();
+
+        var diagnostics = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            app_version = appVersion,
+            runtime_version = runtimeVersion,
+            platform = $"{DeviceInfo.Platform} {DeviceInfo.VersionString}",
+            installed_agents = installed.Count,
+            output_path = s_outputBase,
+        }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+
+        await Clipboard.SetTextAsync(diagnostics);
+        await DisplayAlertAsync("Copied", "Diagnostic info copied to clipboard.", "OK");
+    }
+
+    // --- Marketplace URL ---
 
     private async void OnSaveUrl(object? sender, EventArgs e)
     {
@@ -123,11 +236,46 @@ public partial class SettingsPage : ContentPage
         await DisplayAlertAsync("Saved", "Marketplace URL updated.", "OK");
     }
 
+    // --- Data Management ---
+
+    private async void OnClearOutput(object? sender, EventArgs e)
+    {
+        bool confirm = await DisplayAlertAsync("Clear Output",
+            "This will delete all agent output files. This cannot be undone.", "Clear", "Cancel");
+        if (!confirm) return;
+
+        if (Directory.Exists(s_outputBase))
+        {
+            try
+            {
+                Directory.Delete(s_outputBase, recursive: true);
+                Directory.CreateDirectory(s_outputBase);
+                await DisplayAlertAsync("Cleared", "All agent output has been deleted.", "OK");
+                LoadStats();
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlertAsync("Error", ex.Message, "OK");
+            }
+        }
+    }
+
+    private async void OnResetSetup(object? sender, EventArgs e)
+    {
+        bool confirm = await DisplayAlertAsync("Reset Setup",
+            "This will re-run the setup wizard on next launch.", "Reset", "Cancel");
+        if (!confirm) return;
+
+        Preferences.Set("setup_complete", false);
+        await Shell.Current.GoToAsync("SetupWizardPage");
+    }
+
+    // --- Authentication ---
+
     private async void OnLogin(object? sender, EventArgs e)
     {
         try
         {
-            // Use WebAuthenticator for PKCE flow.
             var callbackUrl = new Uri("purfle://callback");
             var authUrl = new Uri(
                 $"{_marketplace.BaseUrl}/connect/authorize" +
@@ -147,7 +295,6 @@ public partial class SettingsPage : ContentPage
                 return;
             }
 
-            // Exchange code for tokens.
             using var http = new HttpClient();
             var tokenRequest = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -177,28 +324,23 @@ public partial class SettingsPage : ContentPage
                 UpdateAuthStatus();
             }
         }
-        catch (TaskCanceledException)
-        {
-            // User cancelled.
-        }
+        catch (TaskCanceledException) { }
         catch (Exception ex)
         {
             await DisplayAlertAsync("Error", ex.Message, "OK");
         }
     }
 
+    // --- Stats ---
+
     private void LoadStats()
     {
         var installed = _store.ListInstalled();
         long totalInputTokens = 0, totalOutputTokens = 0;
 
-        var outputBase = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "aivm", "output");
-
-        if (Directory.Exists(outputBase))
+        if (Directory.Exists(s_outputBase))
         {
-            foreach (var dir in Directory.EnumerateDirectories(outputBase))
+            foreach (var dir in Directory.EnumerateDirectories(s_outputBase))
             {
                 var jsonlPath = Path.Combine(dir, "run.jsonl");
                 if (!File.Exists(jsonlPath)) continue;
@@ -214,7 +356,7 @@ public partial class SettingsPage : ContentPage
                             totalOutputTokens += ot.GetInt64();
                     }
                 }
-                catch { /* skip malformed entries */ }
+                catch { }
             }
         }
 
@@ -222,66 +364,7 @@ public partial class SettingsPage : ContentPage
                           $"All-time tokens: {totalInputTokens} in / {totalOutputTokens} out";
     }
 
-    private async void OnTestConnection(object? sender, EventArgs e)
-    {
-        TestConnectionLabel.Text = "Testing...";
-        TestConnectionLabel.TextColor = Colors.Gray;
-
-        var anthropicKey = AnthropicKeyEntry.Text?.Trim();
-        if (!string.IsNullOrEmpty(anthropicKey))
-        {
-            try
-            {
-                using var http = new HttpClient();
-                http.DefaultRequestHeaders.Add("x-api-key", anthropicKey);
-                http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
-                var content = new StringContent(
-                    """{"model":"claude-haiku-4-5-20251001","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}""",
-                    System.Text.Encoding.UTF8, "application/json");
-                var resp = await http.PostAsync("https://api.anthropic.com/v1/messages", content);
-                TestConnectionLabel.Text = resp.IsSuccessStatusCode
-                    ? "Anthropic: Connected"
-                    : $"Anthropic: {(int)resp.StatusCode}";
-                TestConnectionLabel.TextColor = resp.IsSuccessStatusCode ? Colors.Green : Colors.Red;
-            }
-            catch (Exception ex)
-            {
-                TestConnectionLabel.Text = $"Anthropic: {ex.Message}";
-                TestConnectionLabel.TextColor = Colors.Red;
-            }
-        }
-        else
-        {
-            TestConnectionLabel.Text = "No API key entered.";
-            TestConnectionLabel.TextColor = Colors.Orange;
-        }
-    }
-
-    private async void OnClearOutput(object? sender, EventArgs e)
-    {
-        bool confirm = await DisplayAlertAsync("Clear Output",
-            "This will delete all agent output files. This cannot be undone.", "Clear", "Cancel");
-        if (!confirm) return;
-
-        var outputBase = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "aivm", "output");
-
-        if (Directory.Exists(outputBase))
-        {
-            try
-            {
-                Directory.Delete(outputBase, recursive: true);
-                Directory.CreateDirectory(outputBase);
-                await DisplayAlertAsync("Cleared", "All agent output has been deleted.", "OK");
-                LoadStats();
-            }
-            catch (Exception ex)
-            {
-                await DisplayAlertAsync("Error", ex.Message, "OK");
-            }
-        }
-    }
+    // --- Helpers ---
 
     private void UpdateAuthStatus()
     {
@@ -297,16 +380,6 @@ public partial class SettingsPage : ContentPage
             AuthStatusLabel.TextColor = Colors.Gray;
             LoginButton.Text = "Login";
         }
-    }
-
-    private async void OnResetSetup(object? sender, EventArgs e)
-    {
-        bool confirm = await DisplayAlertAsync("Reset Setup",
-            "This will re-run the setup wizard on next launch.", "Reset", "Cancel");
-        if (!confirm) return;
-
-        Preferences.Set("setup_complete", false);
-        await Shell.Current.GoToAsync("SetupWizardPage");
     }
 
     private static string GenerateCodeChallenge(out string codeVerifier)
