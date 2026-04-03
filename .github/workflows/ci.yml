@@ -152,6 +152,31 @@ jobs:
       - name: Build
         run: dotnet build ${{ matrix.agent }}/*.csproj --configuration Release
 
+  macos-build:
+    name: MAUI macOS (build)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          include-prerelease: true
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-maui-macos-${{ hashFiles('app/**/*.csproj') }}
+          restore-keys: nuget-maui-macos-
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui
+
+      - name: Build Mac Catalyst
+        run: dotnet build app/src/Purfle.App/Purfle.App.csproj -f net10.0-maccatalyst --configuration Release
+
   mcp-servers-build:
     name: MCP servers (build)
     runs-on: ubuntu-latest

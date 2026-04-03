@@ -112,10 +112,115 @@ jobs:
           name: dashboard
           path: ./artifacts/dashboard
 
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          include-prerelease: true
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui
+
+      - name: Publish Mac Catalyst
+        run: >
+          dotnet publish app/src/Purfle.App/Purfle.App.csproj
+          -f net10.0-maccatalyst
+          --configuration Release
+          -p:CreatePackage=true
+          --output ./artifacts/macos
+
+      - name: Notarize
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          PKG=$(find ./artifacts/macos -name "*.pkg" -o -name "*.dmg" | head -1)
+          if [ -z "$PKG" ]; then
+            echo "No .pkg or .dmg found — skipping notarization"
+            exit 0
+          fi
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_PASSWORD" ]; then
+            echo "Apple credentials not configured — skipping notarization"
+            exit 0
+          fi
+          xcrun notarytool submit "$PKG" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$PKG"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: ./artifacts/macos
+
+  build-windows-msix:
+    name: Build Windows MSIX
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          include-prerelease: true
+
+      - name: Install MAUI workload
+        run: dotnet workload install maui
+
+      - name: Decode signing certificate
+        env:
+          WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        shell: pwsh
+        run: |
+          if ($env:WINDOWS_CERT_PFX) {
+            $bytes = [Convert]::FromBase64String($env:WINDOWS_CERT_PFX)
+            [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\cert.pfx", $bytes)
+            Write-Host "Certificate decoded to $env:RUNNER_TEMP\cert.pfx"
+          } else {
+            Write-Host "No certificate configured — MSIX will be unsigned"
+          }
+
+      - name: Publish MSIX
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $certArgs = @()
+          if (Test-Path "$env:RUNNER_TEMP\cert.pfx") {
+            $certArgs = @(
+              "-p:PackageCertificateKeyFile=$env:RUNNER_TEMP\cert.pfx",
+              "-p:PackageCertificatePassword=$env:WINDOWS_CERT_PASSWORD"
+            )
+          }
+          dotnet publish app/src/Purfle.App/Purfle.App.csproj `
+            -f net10.0-windows10.0.19041.0 `
+            --configuration Release `
+            -p:WindowsPackageType=MSIX `
+            --output ./artifacts/msix `
+            @certArgs
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msix
+          path: ./artifacts/msix/**/*.msix
+
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-runtime, build-sdk, build-dashboard]
+    needs: [build-runtime, build-sdk, build-dashboard, build-macos, build-windows-msix]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -155,3 +260,48 @@ jobs:
             runtime-${{ github.ref_name }}.tar.gz
             dashboard-${{ github.ref_name }}.tar.gz
             artifacts/sdk-cli/*.tgz
+            artifacts/macos-app/**/*.pkg
+            artifacts/macos-app/**/*.dmg
+            artifacts/windows-msix/**/*.msix
+
+  deploy-azure:
+    name: Deploy to Azure
+    runs-on: ubuntu-latest
+    needs: [create-release]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+          include-prerelease: true
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Publish Marketplace API
+        run: >
+          dotnet publish marketplace/src/Purfle.Marketplace.Api/Purfle.Marketplace.Api.csproj
+          --configuration Release
+          --output ./deploy/marketplace
+
+      - name: Deploy Marketplace API
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: purfle-marketplace
+          package: ./deploy/marketplace
+
+      - name: Publish IdentityHub Web
+        run: >
+          dotnet publish identityhub/src/Purfle.IdentityHub.Web/Purfle.IdentityHub.Web.csproj
+          --configuration Release
+          --output ./deploy/identityhub-web
+
+      - name: Deploy IdentityHub Web
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: purfle-identityhub-web
+          package: ./deploy/identityhub-web
