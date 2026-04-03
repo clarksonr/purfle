@@ -113,6 +113,9 @@ jobs:
       - name: Build Core
         run: dotnet build identityhub/src/Purfle.IdentityHub.Core/Purfle.IdentityHub.Core.csproj --configuration Release
 
+      - name: Build Web
+        run: dotnet build identityhub/src/Purfle.IdentityHub.Web/Purfle.IdentityHub.Web.csproj --configuration Release
+
   agents-build:
     name: Agents C# (build)
     runs-on: ubuntu-latest
