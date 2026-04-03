@@ -282,6 +282,71 @@ app.MapGet("/api/admin/attestations", async (HttpContext ctx, IHttpClientFactory
 });
 
 // ============================================================
+// Health endpoint
+// ============================================================
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok", version = "0.1.0" }));
+
+// ============================================================
+// Admin backup/restore endpoints (proxied to IdentityHub API)
+// ============================================================
+
+app.MapGet("/api/admin/backup/download", async (IHttpClientFactory hf) =>
+{
+    var client = hf.CreateClient("identityhub");
+    var resp = await client.GetAsync("/backup");
+    if (!resp.IsSuccessStatusCode)
+        return Results.StatusCode((int)resp.StatusCode);
+
+    var stream = await resp.Content.ReadAsStreamAsync();
+    var fileName = resp.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+        ?? $"identityhub-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip";
+    return Results.File(stream, "application/zip", fileName);
+});
+
+app.MapPost("/api/admin/backup/push-azure", async (IHttpClientFactory hf) =>
+{
+    var client = hf.CreateClient("identityhub");
+    var resp = await client.PostAsync("/backup/push-azure", null);
+    var body = await resp.Content.ReadAsStringAsync();
+    return Results.Content(body, "application/json", statusCode: (int)resp.StatusCode);
+});
+
+app.MapGet("/api/admin/backup/azure", async (IHttpClientFactory hf) =>
+{
+    var client = hf.CreateClient("identityhub");
+    var resp = await client.GetAsync("/backup/azure");
+    var body = await resp.Content.ReadAsStringAsync();
+    return Results.Content(body, "application/json", statusCode: (int)resp.StatusCode);
+});
+
+app.MapGet("/api/admin/backup/azure/{blobName}", async (string blobName, IHttpClientFactory hf) =>
+{
+    var client = hf.CreateClient("identityhub");
+    var resp = await client.GetAsync($"/backup/azure/{Uri.EscapeDataString(blobName)}");
+    if (!resp.IsSuccessStatusCode)
+        return Results.StatusCode((int)resp.StatusCode);
+
+    var stream = await resp.Content.ReadAsStreamAsync();
+    return Results.File(stream, "application/zip", blobName);
+});
+
+app.MapPost("/api/admin/backup/restore", async (HttpContext ctx, IHttpClientFactory hf) =>
+{
+    if (!ctx.Request.HasFormContentType || ctx.Request.Form.Files.Count == 0)
+        return Results.BadRequest(new { error = "Upload a zip file" });
+
+    var file = ctx.Request.Form.Files[0];
+    var client = hf.CreateClient("identityhub");
+    using var content = new MultipartFormDataContent();
+    var streamContent = new StreamContent(file.OpenReadStream());
+    content.Add(streamContent, "file", file.FileName);
+    var resp = await client.PostAsync("/backup/restore", content);
+    var body = await resp.Content.ReadAsStringAsync();
+    return Results.Content(body, "application/json", statusCode: (int)resp.StatusCode);
+});
+
+// ============================================================
 // SVG Badge — /badge/{agentId}
 // ============================================================
 

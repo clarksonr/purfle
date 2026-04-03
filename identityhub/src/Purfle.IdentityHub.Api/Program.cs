@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Purfle.IdentityHub.Api.Services;
 using Purfle.IdentityHub.Core.Implementations;
 using Purfle.IdentityHub.Core.Models;
 using Purfle.IdentityHub.Core.Services;
@@ -16,6 +17,12 @@ builder.Services.AddSingleton<IKeyRevocationService>(
     new JsonFileKeyRevocationService(Path.Combine(storageRoot, "revocations")));
 builder.Services.AddSingleton<ITrustService>(
     new JsonFileTrustService(Path.Combine(storageRoot, "attestations")));
+
+// Register BackupService.
+var azureConnectionString = builder.Configuration["AZURE_STORAGE_CONNECTION_STRING"]
+    ?? Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING");
+var backupContainer = builder.Configuration.GetValue<string>("IdentityHub:BackupContainer") ?? "purfle-backups";
+builder.Services.AddSingleton(new BackupService(storageRoot, azureConnectionString, backupContainer));
 
 // CORS for development.
 builder.Services.AddCors(options =>
@@ -119,6 +126,48 @@ app.MapPost("/verify", async (IKeyRevocationService revocationService, HttpConte
     // In a full implementation, this would verify the JWS signature against
     // the registered public key. For now, we confirm the key is not revoked.
     return Results.Ok(new { verified = true, keyId });
+});
+
+// --- Health Endpoint ---
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok", version = "0.1.0" }));
+
+// --- Backup Endpoints ---
+
+app.MapGet("/backup", async (BackupService backup, CancellationToken ct) =>
+{
+    var stream = await backup.CreateBackupAsync(ct);
+    return Results.File(stream, "application/zip", $"identityhub-backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}.zip");
+});
+
+app.MapPost("/backup/restore", async (BackupService backup, HttpContext ctx, CancellationToken ct) =>
+{
+    if (!ctx.Request.HasFormContentType || ctx.Request.Form.Files.Count == 0)
+        return Results.BadRequest(new { error = "Upload a zip file" });
+
+    var file = ctx.Request.Form.Files[0];
+    await using var stream = file.OpenReadStream();
+    await backup.RestoreAsync(stream, ct);
+    return Results.Ok(new { restored = true, timestamp = DateTimeOffset.UtcNow });
+});
+
+app.MapPost("/backup/push-azure", async (BackupService backup, CancellationToken ct) =>
+{
+    var stream = await backup.CreateBackupAsync(ct);
+    await backup.PushToAzureAsync(stream, ct);
+    return Results.Ok(new { pushed = true, timestamp = DateTimeOffset.UtcNow });
+});
+
+app.MapGet("/backup/azure", async (BackupService backup, CancellationToken ct) =>
+{
+    var backups = await backup.ListAzureBackupsAsync(ct);
+    return Results.Ok(backups);
+});
+
+app.MapGet("/backup/azure/{blobName}", async (BackupService backup, string blobName, CancellationToken ct) =>
+{
+    var stream = await backup.PullFromAzureAsync(blobName, ct);
+    return Results.File(stream, "application/zip", blobName);
 });
 
 app.Run();

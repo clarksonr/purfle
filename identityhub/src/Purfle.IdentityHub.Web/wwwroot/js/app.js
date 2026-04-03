@@ -13,4 +13,5 @@ Router
     .add(/^\/admin\/publishers$/, () => renderAdminPublishers())
     .add(/^\/admin\/keys$/, () => renderAdminKeys())
     .add(/^\/admin\/attestations$/, () => renderAdminAttestations())
+    .add(/^\/admin\/backup$/, () => renderAdminBackup())
     .start();

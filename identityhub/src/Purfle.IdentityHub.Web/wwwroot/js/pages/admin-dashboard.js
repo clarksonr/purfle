@@ -17,6 +17,7 @@ async function renderAdminDashboard() {
                 <a href="/admin/publishers">Publishers</a>
                 <a href="/admin/keys">Keys</a>
                 <a href="/admin/attestations">Attestations</a>
+                <a href="/admin/backup">Backup</a>
                 <a href="#" onclick="event.preventDefault(); API.setAdminToken(''); Router.navigate('/admin');">Logout</a>
             </nav>
 
