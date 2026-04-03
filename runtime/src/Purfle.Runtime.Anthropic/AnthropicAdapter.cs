@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Purfle.Runtime.Adapters;
+using Purfle.Runtime.Auth;
 using Purfle.Runtime.Manifest;
 using Purfle.Runtime.Mcp;
 using Purfle.Runtime.Sandbox;
@@ -92,15 +93,30 @@ public sealed class AnthropicAdapter : IInferenceAdapter, ILlmAdapter
         AgentSandbox sandbox,
         HttpClient? http = null,
         IReadOnlyList<IMcpClient>? mcpClients = null,
-        IAgent? agent = null)
+        IAgent? agent = null,
+        ResolvedCredential? credential = null)
     {
-        var key = Environment.GetEnvironmentVariable(EnvApiKey);
+        string? key;
+        if (credential != null)
+        {
+            key = credential.Profile.Credential switch
+            {
+                ApiKeyCredential ak => ak.ApiKey,
+                OAuthCredential oa => oa.AccessToken,
+                _ => null
+            };
+        }
+        else
+        {
+            key = Environment.GetEnvironmentVariable(EnvApiKey);
+        }
+
         if (string.IsNullOrWhiteSpace(key))
             throw new InvalidOperationException(
                 $"Environment variable '{EnvApiKey}' is not set.");
 
         _apiKey   = key;
-        _model    = manifest.Runtime.Model ?? DefaultModel;
+        _model    = credential?.Model ?? manifest.Runtime.Model ?? DefaultModel;
         _http     = http ?? new HttpClient();
         _sandbox  = sandbox;
         _executor = new BuiltInToolExecutor(sandbox, _http);

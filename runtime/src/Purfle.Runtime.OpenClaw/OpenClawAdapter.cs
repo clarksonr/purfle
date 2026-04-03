@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Purfle.Runtime.Adapters;
+using Purfle.Runtime.Auth;
 
 namespace Purfle.Runtime.OpenClaw;
 
@@ -55,6 +56,25 @@ public sealed class OpenClawAdapter : IInferenceAdapter, ILlmAdapter
 
         _apiKey    = key;
         _model     = model ?? DefaultModel;
+        _maxTokens = maxTokens;
+        _http      = http ?? new HttpClient();
+    }
+
+    /// <summary>Creates an OpenAI adapter from a resolved credential.</summary>
+    public OpenClawAdapter(ResolvedCredential credential, int maxTokens = DefaultMaxTokens, HttpClient? http = null)
+    {
+        var key = credential.Profile.Credential switch
+        {
+            ApiKeyCredential ak => ak.ApiKey,
+            OAuthCredential oa => oa.AccessToken,
+            _ => null
+        };
+
+        if (string.IsNullOrWhiteSpace(key))
+            throw new InvalidOperationException("No API key available for OpenAI.");
+
+        _apiKey    = key;
+        _model     = credential.Model ?? DefaultModel;
         _maxTokens = maxTokens;
         _http      = http ?? new HttpClient();
     }

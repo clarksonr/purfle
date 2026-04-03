@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Purfle.Runtime.Adapters;
+using Purfle.Runtime.Auth;
 
 namespace Purfle.Runtime.Ollama;
 
@@ -47,6 +48,14 @@ public sealed class OllamaAdapter : IInferenceAdapter, ILlmAdapter
     {
         _model   = string.IsNullOrWhiteSpace(model) ? DefaultModel : model;
         _baseUrl = (baseUrl ?? DefaultBaseUrl).TrimEnd('/');
+        _http    = http ?? new HttpClient();
+    }
+
+    /// <summary>Creates an Ollama adapter from a resolved credential.</summary>
+    public OllamaAdapter(ResolvedCredential credential, HttpClient? http = null)
+    {
+        _model   = string.IsNullOrWhiteSpace(credential.Model) ? DefaultModel : credential.Model;
+        _baseUrl = (credential.Profile.Credential is LocalServiceCredential ls ? ls.BaseUrl : DefaultBaseUrl).TrimEnd('/');
         _http    = http ?? new HttpClient();
     }
 

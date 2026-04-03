@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Purfle.Runtime.Auth;
 using Purfle.Runtime.Manifest;
 
 namespace Purfle.Runtime.Adapters;
@@ -11,9 +12,10 @@ namespace Purfle.Runtime.Adapters;
 /// infrastructure. Does not perform tool-call loops or sandbox enforcement.
 ///
 /// <para>
-/// Reads <c>ANTHROPIC_API_KEY</c> from the environment. Model and max_tokens are
-/// taken from <see cref="AgentManifest.Runtime"/>; both fall back to safe defaults
-/// when omitted.
+/// API key can be provided via <see cref="ResolvedCredential"/>, or read from the
+/// <c>ANTHROPIC_API_KEY</c> environment variable. Model and max_tokens are
+/// taken from <see cref="AgentManifest.Runtime"/> or the resolved credential;
+/// both fall back to safe defaults when omitted.
 /// </para>
 /// </summary>
 public sealed class AnthropicAdapter : ILlmAdapter
@@ -27,8 +29,7 @@ public sealed class AnthropicAdapter : ILlmAdapter
     private readonly HttpClient _http;
     private readonly string     _model;
     private readonly int        _maxTokens;
-    // Key is read lazily at call time so the adapter can be constructed before the
-    // environment variable is available (e.g. before the app injects it from SecureStorage).
+    private readonly string?    _resolvedApiKey;
 
     /// <summary>Creates an adapter using default model and max_tokens.</summary>
     public AnthropicAdapter(HttpClient? http = null)
@@ -46,14 +47,25 @@ public sealed class AnthropicAdapter : ILlmAdapter
         _http      = http ?? new HttpClient();
     }
 
+    /// <summary>Creates an adapter from a resolved credential.</summary>
+    public AnthropicAdapter(ResolvedCredential credential, int maxTokens = DefaultMaxTokens, HttpClient? http = null)
+    {
+        _model          = credential.Model ?? DefaultModel;
+        _maxTokens      = maxTokens;
+        _http           = http ?? new HttpClient();
+        _resolvedApiKey = credential.Profile.Credential is ApiKeyCredential ak ? ak.ApiKey
+                        : credential.Profile.Credential is OAuthCredential oa ? oa.AccessToken
+                        : null;
+    }
+
     /// <inheritdoc/>
     /// <exception cref="LlmAdapterException">
-    /// Thrown when <c>ANTHROPIC_API_KEY</c> is not set or when the API returns an error.
+    /// Thrown when no API key is available or when the API returns an error.
     /// </exception>
     public async Task<LlmResult> CompleteAsync(
         string systemPrompt, string userMessage, CancellationToken ct = default)
     {
-        var apiKey = Environment.GetEnvironmentVariable(EnvApiKey);
+        var apiKey = _resolvedApiKey ?? Environment.GetEnvironmentVariable(EnvApiKey);
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new LlmAdapterException($"Environment variable '{EnvApiKey}' is not set.");
 
