@@ -42,8 +42,22 @@ public static class ServiceCollectionExtensions
             services.AddSingleton<IManifestBlobStore>(new LocalFileBlobStore(dataDirectory));
         }
 
-        // Bundle blob store (always local for now — Azure option can be added later)
-        services.AddSingleton<IBundleBlobStore>(new LocalFileBundleStore(dataDirectory));
+        // Bundle blob store
+        var bundleStore = configuration["Storage:BundleStore"] ?? "Local";
+        if (bundleStore == "Azure")
+        {
+            var connectionString = configuration["AzureBlobStorage:ConnectionString"]
+                ?? Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING")
+                ?? throw new InvalidOperationException("AzureBlobStorage:ConnectionString or AZURE_STORAGE_CONNECTION_STRING is required when BundleStore is 'Azure'.");
+            var containerName = configuration["AzureBlobStorage:BundleContainerName"]
+                ?? Environment.GetEnvironmentVariable("PURFLE_BUNDLES_CONTAINER")
+                ?? "purfle-bundles";
+            services.AddSingleton<IBundleBlobStore>(new AzureBlobBundleStore(connectionString, containerName));
+        }
+        else
+        {
+            services.AddSingleton<IBundleBlobStore>(new LocalFileBundleStore(dataDirectory));
+        }
 
         // Identity stores
         services.AddSingleton<IUserStore<Publisher>>(new JsonUserStore(dataDirectory));
