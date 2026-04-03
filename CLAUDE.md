@@ -26,7 +26,7 @@ The AIVM is a C# class inside a .NET MAUI desktop app. It:
 1. Loads signed agent manifests from disk
 2. Starts each agent on its own thread on a schedule
 3. Enforces the manifest's declared capabilities and permissions
-4. Provides LLM inference via adapters (Anthropic first)
+4. Provides LLM inference via the engine adapter declared in the manifest
 5. Exposes tools to the LLM via MCP
 6. Writes agent output to a sandboxed local path
 7. The LLM never touches the system directly — the AIVM executes on its behalf
@@ -102,6 +102,10 @@ my-agent.purfle/
   No permissions entry without a matching capability. Capability without permissions is fine.
 - **Credentials:** Owned by runtime (Windows Credential Manager / Mac Keychain). Agent never sees tokens.
 - **MCP role:** Tool protocol only. AIVM wires tools at load time.
+- **Engine agnostic — locked:** The runtime selects the adapter based on `runtime.engine`
+  in the manifest. No engine is hardcoded, preferred, or defaulted anywhere in the codebase,
+  prompts, or documentation. Supported engines: `gemini`, `anthropic`, `openai`, `ollama`.
+  Current developer preference: Gemini. Do not assume Anthropic anywhere.
 - **Cross-agent output sharing:** Deferred.
 - **`io` block:** Optional, no enforcement in phase 1.
 - **No over-engineering:** No abstractions for hypothetical requirements.
@@ -152,15 +156,15 @@ my-agent.purfle/
   },
   "capabilities": ["llm.chat", "network.outbound", "env.read"],
   "permissions": {
-    "network.outbound": { "hosts": ["api.anthropic.com"] },
-    "env.read":         { "vars": ["ANTHROPIC_API_KEY"] },
+    "network.outbound": { "hosts": ["<llm-provider-api-host>"] },
+    "env.read":         { "vars": ["<ENGINE>_API_KEY"] },
     "fs.read":          { "paths": ["./data"] },
     "fs.write":         { "paths": ["./output"] }
   },
   "runtime": {
     "requires": "purfle/0.1",
-    "engine": "anthropic",
-    "model": "claude-sonnet-4-20250514",
+    "engine":   "gemini | anthropic | openai | ollama",
+    "model":    "<model string for chosen engine>",
     "max_tokens": 1000
   },
   "lifecycle": {
@@ -174,6 +178,14 @@ my-agent.purfle/
   "io": {}
 }
 ```
+
+### Engine values and their model strings
+| Engine | `runtime.engine` | Example model string | API key env var |
+|---|---|---|---|
+| Google Gemini | `gemini` | `gemini-2.0-flash` | `GEMINI_API_KEY` |
+| Anthropic | `anthropic` | `claude-sonnet-4-20250514` | `ANTHROPIC_API_KEY` |
+| OpenAI | `openai` | `gpt-4o` | `OPENAI_API_KEY` |
+| Ollama (local) | `ollama` | `llama3` | none (localhost:11434) |
 
 ### Capability strings
 | Capability | Permission config | Meaning |
@@ -197,18 +209,17 @@ my-agent.purfle/
 | `event` | `event.source, event.topic` | Run when an MCP server emits a named event |
 
 **window trigger details:**
-- `window_open` — fires once when the window opens (start time reached)
-- `window_close` — fires once just before the window closes (end time approached)
-- `interval_within` — fires on `interval_minutes` cadence, only while inside the window;
-  suppressed outside the window, no catch-up runs after window closes
-- Window start/end can be ISO 8601 datetime (one-shot) or cron expression (recurring windows)
-- Example: a daily 6-hour maintenance window → `start: "0 2 * * *"`, `end: "0 8 * * *"`
+- `window_open` — fires once when the window opens
+- `window_close` — fires once shortly before the window closes (default 60s lead)
+- `interval_within` — fires on `interval_minutes` cadence only while inside the window;
+  suppressed outside, no catch-up after window closes
+- start/end: ISO 8601 datetime (one-shot) or cron expression (recurring)
 
 **event trigger details:**
 - AIVM subscribes to the MCP server's event stream at agent load time
-- When the named topic fires, the agent runs immediately on its dedicated thread
-- If the agent is already running, the event is queued (one deep); further events are dropped
-- Useful for: webhook callbacks, sensor threshold alerts, orbital pass notifications (RFC 0002)
+- When the named topic fires, the agent runs immediately
+- If already running: queue event (depth 1), drop further events and log
+- On unload: unsubscribe and close connection cleanly
 
 ---
 
@@ -220,8 +231,8 @@ my-agent.purfle/
 | AIVM | C# class inside MAUI |
 | Manifest spec | JSON Schema Draft 2020-12 |
 | Agent identity | JWS / ES256 |
-| Inference | Anthropic (primary); OpenAI, Gemini, Ollama |
-| Scheduler | PeriodicTimer + NCrontab + window/event extensions (planned) |
+| Inference | Engine-agnostic: Gemini, OpenAI, Ollama, Anthropic (adapter per engine) |
+| Scheduler | PeriodicTimer + NCrontab + WindowTrigger + EventTrigger |
 | SDK / CLI | TypeScript / Node.js |
 | Tests | xUnit + Jest |
 | macOS credentials | Keychain via SecureStorage |
@@ -265,7 +276,9 @@ Repeat only if you generate a new key pair.
 
 | Variable | Where | Purpose |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Local + GH secret | LLM inference |
+| `GEMINI_API_KEY` | Local + GH secret | LLM inference — Gemini (current dev preference) |
+| `ANTHROPIC_API_KEY` | Local + GH secret | LLM inference — Anthropic adapter |
+| `OPENAI_API_KEY` | Local + GH secret | LLM inference — OpenAI adapter |
 | `PURFLE_REGISTRY_API_KEY` | Local only, one-time | Register signing key |
 | `PURFLE_ADMIN_TOKEN` | Azure App Service env | IdentityHub.Web admin auth |
 | `AZURE_STORAGE_CONNECTION_STRING` | Azure App Service env | Backups + bundle store |
@@ -296,16 +309,18 @@ Repeat only if you generate a new key pair.
 - Examples: hello-world, assistant, email-monitor, demo-agent, window-agent, event-agent
 - AGENT_MODEL.md
 
-**Runtime — 132 passing tests**
+**Runtime — 139 passing tests**
 - AgentLoader (7-step), ManifestLoader/Validator, IdentityVerifier, JWS ES256
 - IKeyRegistry, HttpKeyRegistryClient
 - CapabilityNegotiator, AgentSandbox (network/fs/env/MCP)
 - LoadFailureReason (13 reasons), BuiltInToolExecutor, ConversationSession
-- AnthropicAdapter, GeminiAdapter, OpenClawAdapter, OllamaAdapter (backoff, token usage)
+- GeminiAdapter, AnthropicAdapter, OpenClawAdapter, OllamaAdapter (backoff, token usage)
 - ProcessAgentRunner, CredentialStoreFactory (Win/Mac/Linux/InMemory)
 - Scheduler: interval, cron, startup, window, event — overlap skip, crash isolation
 - WindowTrigger: window_open, window_close, interval_within (ISO 8601 + cron windows)
 - EventTrigger: IEventSource/IEventSourceFactory, queue depth 1, drop on full
+- **SseEventSource** — production SSE client with exponential backoff + jitter reconnect
+- **SseEventSourceFactory** — DI-ready factory for production event sources
 - AgentRunner (run.jsonl + run.log), AgentAssemblyLoadContext, McpClient
 - Purfle.TestAgents.Hello
 
@@ -317,10 +332,16 @@ Repeat only if you generate a new key pair.
 **SDK & CLI** — 49 core + 17 CLI tests
 - init, build, sign, simulate (--trigger window_open/event), publish, search, install, login,
   validate, run, security-scan, pack (SHA-256 sidecar), setup (GitHub token check), demo
+- **purfle demo** — color-coded banner, server summary table, next-steps block
 - Bundle SHA-256 integrity: pack writes .sha256, install verifies hash on download
 
 **Desktop App**
-- SetupWizardPage (4-step), ConsentPage, AgentDetailPage (5-tab)
+- **DashboardPage** — default landing tab with summary bar, today's digest, agent roster
+- SetupWizardPage (4-step), ConsentPage, AgentDetailPage (6-tab incl. Install)
+- **AgentCard live state** — pulse animation, relative timestamps, 100-char output preview,
+  120-char error truncation, "No output yet" placeholder
+- **Marketplace install flow** — Install tab fetches agent metadata, streams CLI output live,
+  success/error banners, offline handling
 - AgentCard, LogViewPage, AgentRunPage, SettingsPage
 - purfle:// deep link (Windows + macOS), UNUserNotificationCenter (macOS)
 - Entitlements.plist, CFBundleURLTypes, code signing config in csproj
@@ -340,6 +361,7 @@ Repeat only if you generate a new key pair.
 - Bundle SHA-256 hash stored on upload, returned in version metadata
 
 **Dogfood Agents** — email-monitor, pr-watcher, report-builder, file-assistant (signed)
+- **report-builder** — rich Markdown digest with tables (displays in Dashboard digest)
 
 **Infrastructure** — infra/marketplace.bicep + infra/identityhub-web.bicep
 
@@ -347,11 +369,12 @@ Repeat only if you generate a new key pair.
 
 **Docs** — GETTING_STARTED, MANIFEST_REFERENCE, PUBLISHING, TROUBLESHOOTING, ROADMAP
 
+**README.md** — public-facing project README with architecture, features, quick start, agent model
+
 ### What does NOT exist yet (priority order)
 1. Register signing public key — one-time local action (see Key Registration above)
 2. Azure deployment — needs AZURE_CREDENTIALS secret then tag push triggers it
 3. Cross-agent output sharing (deferred)
-4. Real-time MCP event source implementation (IEventSource for production use)
 
 ---
 
@@ -365,13 +388,17 @@ Repeat only if you generate a new key pair.
 6. **Complete each task fully including tests before moving to the next.**
 7. **If underdetermined, stop and ask rather than invent.**
 8. **Placeholders:** Never hardcode PLACEHOLDER_* values. Use the string as-is.
-9. **Git rules — non-negotiable:**
-   - Run all git commands from repo root. Never use `cd` before git.
-   - Never chain with `&&`. Every command is its own line.
-   - Never `git add .` — always stage by explicit file path.
-   - Stage then commit as two separate commands.
-   - Accumulate all commits locally. `git push` once at the very end.
-10. **commit.md workflow:**
+9. **Engine agnostic — non-negotiable:** Never assume, default, or hardcode any
+   specific LLM engine. Always derive the engine from `runtime.engine` in the manifest.
+   Never write example manifests, test fixtures, or documentation that imply Anthropic
+   is the default. Current developer preference is Gemini.
+10. **Git rules — non-negotiable:**
+    - Run all git commands from repo root. Never use `cd` before git.
+    - Never chain with `&&`. Every command is its own line.
+    - Never `git add .` — always stage by explicit file path.
+    - Stage then commit as two separate commands.
+    - Accumulate all commits locally. `git push` once at the very end.
+11. **commit.md workflow:**
     - Create `commit.md` at session start using the template below.
     - Append an entry each time a logical unit of work is complete.
     - At session end: read commit.md top to bottom, execute each group.
