@@ -265,7 +265,7 @@ purfle/
 │   └── src/
 │       ├── src.sln
 │       └── Purfle.App/
-│           ├── Pages/            ← Search, MyAgents, Settings, AgentRun, AgentDetail, LogView
+│           ├── Pages/            ← Search, MyAgents, Settings, AgentRun, AgentDetail, LogView, SetupWizard, Consent
 │           ├── Controls/         ← AgentCard
 │           ├── ViewModels/       ← MainViewModel, AgentCardViewModel
 │           └── Services/         ← AgentStore, AgentExecutorService, AppAdapterFactory, MarketplaceService, CredentialService, NotificationService
@@ -283,7 +283,7 @@ purfle/
 │       └── Purfle.Marketplace.Tests/ ← 13 tests (registry, attestation, verification)
 ├── sdk/
 │   ├── packages/
-│   │   ├── cli/src/commands/     ← init, build, sign, pack, simulate, publish, search, install, login
+│   │   ├── cli/src/commands/     ← init, build, sign, pack, simulate, publish, search, install, login, setup
 │   │   └── core/src/
 │   ├── package.json
 │   └── tsconfig.json
@@ -344,26 +344,30 @@ purfle/
 
 **SDK & CLI (Phase 3 — Complete)**
 - `@purfle/core` — manifest types, full Ajv Draft 2020-12 validation against spec schema, JWS sign/verify, canonical JSON
-- `@purfle/cli` — all commands: init, build, sign, simulate, publish, search, install, login, validate, run, security-scan, pack
+- `@purfle/cli` — all commands: init, build, sign, simulate, publish, search, install, login, validate, run, security-scan, pack, setup
 - `purfle init` — scaffolds agent directory with manifest template
 - `purfle build` — validates manifest against spec schema (Draft 2020-12)
 - `purfle sign` — signs with existing key or generates new key pair
 - `purfle pack` — creates `.purfle` ZIP bundle from signed agent directory
 - `purfle publish` — publishes manifest + uploads bundle to marketplace
 - `purfle install` — downloads bundle (or manifest-only fallback), extracts to local store
+- `purfle setup` — interactive environment check: tools (node/dotnet/npm), API keys, key registry reachability, signing key (generates if missing), key registration (when PURFLE_REGISTRY_API_KEY set), validates all agent manifests
 - `ScheduleBlock` type added to manifest.ts (interval, cron, startup)
 - **73 passing core tests**, **16 passing CLI tests**
 
-**Desktop App (Phase 3+5 — Enhanced)**
+**Desktop App (Phase 3+5+6 — Enhanced)**
 - .NET MAUI desktop app — builds for Windows and Mac
-- Pages: Search (marketplace browser), MyAgents (agent cards), Settings, AgentRun (chat UI), AgentDetail, LogView
+- Pages: Search (marketplace browser), MyAgents (agent cards), Settings, AgentRun (chat UI), AgentDetail (5-tab), LogView, SetupWizard, Consent
+- `SetupWizardPage` — 4-step first-run wizard: Welcome → Engine picker (Anthropic/OpenAI/Gemini/Ollama) with test connection → Install first agent (marketplace, file picker, or featured dogfood agents) → Summary. Stores `setup_complete` in Preferences.
+- `ConsentPage` — Android-style permission screen: translates manifest capabilities to plain English, shows schedule, MCP servers, signature status (signed/unsigned), collapsible raw manifest viewer. Accepts `manifestPath` or `manifestJson` query properties.
+- `AgentDetailPage` — expanded 5-tab view: Overview (engine/model, token usage last/today/all-time, output path), Permissions (capability translation, MCP server health check), Files (read/write paths with existence check, recent output), Run History (last 20 runs with aggregate stats), System.md (readonly viewer). Header: Run Now, Pause, Review Permissions, Uninstall.
 - `AgentCard` — output preview (last 2 lines), status indicator (grey/orange/red/green with pulse animation), Run Now button, token usage, error badge with tap-to-expand
 - `AgentCardViewModel` — wraps AgentRunner, polls status every 5s, fires system tray notifications on completion/error
 - `MainViewModel` — ObservableCollection, AddAgentCommand, RefreshCommand, SortCommand (name/lastrun/nextrun/status)
 - `MyAgentsPage` — empty state with CTA, pull-to-refresh, sort controls
 - `LogViewPage` — structured collapsible entries (timestamp/duration/status), filter (All/Success/Error), copy-to-clipboard, JSONL + text fallback
 - `AgentRunPage` — inline tool call display (collapsed default), token count per message, export conversation to file
-- `SettingsPage` — marketplace URL, engine picker, API key storage, OAuth PKCE, agent stats (count + all-time tokens), test connection button, clear all output with confirmation
+- `SettingsPage` — marketplace URL, engine picker, API key storage, OAuth PKCE, agent stats (count + all-time tokens), test connection button, clear all output with confirmation, Reset Setup button
 - `AgentStore` — local install at `~/.purfle/agents/<id>/`; supports raw manifest and `.purfle` ZIP
 - `AppAdapterFactory` — creates AnthropicAdapter or GeminiAdapter, supports API key + engine + model override
 - `AgentExecutorService` — uses live key registry for signature verification
@@ -412,8 +416,8 @@ purfle/
 - Dark theme, SignalR real-time agent status, start/stop controls, log streaming
 
 **CI/CD**
-- `.github/workflows/ci.yml` — matrix build (runtime, SDK, dashboard, agents, MCP servers)
-- `.github/workflows/release.yml` — tag-triggered release with artifacts
+- `.github/workflows/ci.yml` — matrix build (runtime, SDK, dashboard, agents, MCP servers), `include-prerelease: true` for .NET 10 preview
+- `.github/workflows/release.yml` — tag-triggered release with artifacts, `include-prerelease: true` for .NET 10 preview
 - `.github/dependabot.yml` — weekly NuGet + npm dependency monitoring
 
 **Marketplace (Phase 4 — Complete)**
@@ -446,7 +450,7 @@ purfle/
 - `docs/ROADMAP.md` — phase-based roadmap
 
 ### What does NOT exist yet (priority order)
-1. Register new signing public key with Azure key registry (PURFLE_REGISTRY_API_KEY needed) — dogfood manifests are signed but verified only via StaticKeyRegistry until key is registered
+1. Register new signing public key with Azure key registry (PURFLE_REGISTRY_API_KEY needed) — `purfle setup` automates this when env var is set, but key hasn't been registered yet
 2. Python agent implementations (Python not available on primary dev machine)
 3. Azure-backed bundle blob store (LocalFileBundleStore only for now)
 4. Bundle integrity hashing (SHA-256 of ZIP stored with version metadata)
