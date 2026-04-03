@@ -74,7 +74,8 @@ public sealed class AgentsController(
             versions.Select(v => new AgentVersionSummary(
                 v.Version,
                 v.PublishedAt,
-                v.Downloads
+                v.Downloads,
+                v.BundleHash
             )).ToList()
         );
     }
@@ -243,12 +244,22 @@ public sealed class AgentsController(
         if (agentVersion is null)
             return NotFound($"Version {version} not found for agent '{agentId}'.");
 
-        var blobRef = await bundleStore.StoreAsync(agentId, version, Request.Body, ct);
+        // Buffer the stream to compute SHA-256 and store
+        using var ms = new MemoryStream();
+        await Request.Body.CopyToAsync(ms, ct);
+        ms.Position = 0;
+
+        var hash = System.Security.Cryptography.SHA256.HashData(ms.ToArray());
+        var bundleHash = Convert.ToHexStringLower(hash);
+        ms.Position = 0;
+
+        var blobRef = await bundleStore.StoreAsync(agentId, version, ms, ct);
 
         agentVersion.BundleBlobRef = blobRef;
+        agentVersion.BundleHash = bundleHash;
         await agentVersions.UpdateAsync(agentVersion, ct);
 
-        return Ok(new { agentId, version, bundleBlobRef = blobRef });
+        return Ok(new { agentId, version, bundleBlobRef = blobRef, bundleHash });
     }
 
     /// <summary>

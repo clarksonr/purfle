@@ -8,6 +8,7 @@ public sealed class AgentVersion
     public required string ManifestBlobRef { get; set; }
     public string? BundleBlobRef { get; set; }
     public Guid SigningKeyId { get; set; }
+    public string? BundleHash { get; set; }
     public DateTimeOffset PublishedAt { get; set; }
     public long Downloads { get; set; }
 }

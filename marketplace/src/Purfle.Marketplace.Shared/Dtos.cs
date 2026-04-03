@@ -48,7 +48,8 @@ public sealed record AgentDetailResponse(
 public sealed record AgentVersionSummary(
     string Version,
     DateTimeOffset PublishedAt,
-    long Downloads
+    long Downloads,
+    string? BundleHash = null
 );
 
 // --- Publisher Verification DTOs ---

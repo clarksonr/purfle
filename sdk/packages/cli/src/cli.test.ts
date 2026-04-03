@@ -224,6 +224,20 @@ describe("purfle pack", () => {
     assert.ok(stderr.includes("not signed"));
   });
 
+  it("creates a .sha256 sidecar file alongside the bundle", () => {
+    const agentDir = join(tmp, "pack-test");
+    const { stdout, code } = run(["pack", agentDir]);
+    assert.equal(code, 0);
+    assert.ok(stdout.includes("SHA-256:"));
+
+    const { readdirSync } = require("fs");
+    const sha256Files = readdirSync(agentDir).filter((f: string) => f.endsWith(".sha256"));
+    assert.equal(sha256Files.length, 1, "Expected exactly one .sha256 sidecar file");
+
+    const hash = readFileSync(join(agentDir, sha256Files[0]), "utf8").trim();
+    assert.match(hash, /^[a-f0-9]{64}$/, "SHA-256 hash should be 64 hex characters");
+  });
+
   it("bundle extracts back to original files", () => {
     const agentDir = join(tmp, "pack-test");
     run(["pack", agentDir]);

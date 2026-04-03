@@ -1,4 +1,5 @@
 import { readFileSync, existsSync, readdirSync, statSync, writeFileSync } from "fs";
+import { createHash } from "crypto";
 import { join, relative } from "path";
 import { parseManifest } from "@purfle/core";
 
@@ -30,9 +31,17 @@ export function packCommand(dir: string, options: PackOptions): void {
 
   createZip(dir, files, outputPath);
 
+  // Compute SHA-256 of the bundle
+  const bundleData = readFileSync(outputPath);
+  const sha256 = createHash("sha256").update(bundleData).digest("hex");
+
   console.log(`Packed ${manifest.name} v${manifest.version}`);
   console.log(`  Bundle: ${outputPath}`);
   console.log(`  Files:  ${files.length}`);
+  console.log(`  SHA-256: ${sha256}`);
+
+  // Write hash to a sidecar file for use during publish
+  writeFileSync(outputPath + ".sha256", sha256 + "\n");
 }
 
 /** Recursively collect all files in a directory, excluding the output .purfle file. */

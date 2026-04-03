@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync, existsSync, rmSync } from "fs";
+import { createHash } from "crypto";
 import { join } from "path";
 import { getRegistryUrl, apiGet, apiDownloadBinary, agentStorePath } from "../marketplace.js";
 import { extractZip } from "../zip.js";
@@ -22,6 +23,32 @@ export async function installCommand(agentId: string, options: InstallOptions): 
     const storePath = agentStorePath(agentId);
 
     if (bundleData) {
+      // Verify SHA-256 integrity if hash is available from the registry
+      try {
+        const versionSuffix2 = options.version
+          ? `versions/${encodeURIComponent(options.version)}`
+          : "latest";
+        const detailPath = `api/agents/${encodeURIComponent(agentId)}`;
+        const detail = await apiGet<{ versions?: Array<{ version: string; bundleHash?: string }> }>(registry, detailPath);
+        const expectedHash = detail?.versions?.find(
+          (v) => options.version ? v.version === options.version : true
+        )?.bundleHash;
+
+        if (expectedHash) {
+          const actualHash = createHash("sha256").update(bundleData).digest("hex");
+          if (actualHash !== expectedHash) {
+            console.error(`SHA-256 integrity check failed!`);
+            console.error(`  Expected: ${expectedHash}`);
+            console.error(`  Actual:   ${actualHash}`);
+            console.error(`Bundle may have been tampered with. Aborting install.`);
+            process.exit(1);
+          }
+          console.log(`SHA-256 verified: ${actualHash}`);
+        }
+      } catch {
+        // If we can't fetch metadata, proceed without hash verification
+      }
+
       // Bundle found — extract it.
       if (existsSync(storePath)) rmSync(storePath, { recursive: true });
       mkdirSync(storePath, { recursive: true });
