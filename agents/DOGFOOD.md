@@ -14,15 +14,61 @@ On Windows, use the system environment variables dialog or:
 [System.Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "sk-ant-...", "User")
 ```
 
-### MCP Mock Servers
+### GitHub Token (for pr-watcher)
 
-Start the mock servers before running agents:
+The pr-watcher agent uses the real GitHub API via the MCP GitHub server. You need a personal access token with `repo` scope.
+
+**Generate a token:**
+1. Go to https://github.com/settings/tokens
+2. Click "Generate new token (classic)"
+3. Select the `repo` scope
+4. Copy the token
+
+**Configure the token (choose one):**
 
 ```bash
-# Terminal 1 — Gmail mock (port 8102)
+# Option 1: Environment variable
+export GITHUB_TOKEN="ghp_..."
+
+# Option 2: Purfle credential file
+mkdir -p ~/.purfle
+echo "ghp_..." > ~/.purfle/github-token
+chmod 600 ~/.purfle/github-token
+```
+
+On Windows:
+```powershell
+[System.Environment]::SetEnvironmentVariable("GITHUB_TOKEN", "ghp_...", "User")
+```
+
+### Gmail OAuth (for email-monitor)
+
+The email-monitor agent uses the real Gmail API via the MCP Gmail server with OAuth 2.0 PKCE.
+
+**Setup:**
+1. Create OAuth credentials in Google Cloud Console (https://console.cloud.google.com/apis/credentials)
+2. Configure as a Desktop application
+3. Set the following environment variables:
+
+```bash
+export GMAIL_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export GMAIL_CLIENT_SECRET="your-client-secret"
+```
+
+4. On first run, the MCP Gmail server will open a browser for OAuth consent
+5. Tokens are cached in `~/.purfle/gmail-tokens.json` for subsequent runs
+
+**Fallback:** If OAuth is not configured, the Gmail server falls back to mock data for development.
+
+### MCP Servers
+
+Start the MCP servers before running agents:
+
+```bash
+# Terminal 1 — Gmail (port 8102)
 cd tools/mcp-gmail && npm start
 
-# Terminal 2 — GitHub mock (port 8111)
+# Terminal 2 — GitHub (port 8111)
 cd tools/mcp-github && npm start
 ```
 
@@ -32,15 +78,15 @@ cd tools/mcp-github && npm start
 - **Schedule:** Every 15 minutes
 - **MCP Server:** mcp-gmail on localhost:8102
 - **Output:** `%LOCALAPPDATA%/aivm/output/b2e4f6a8-1234-4abc-9def-111111111111/`
-- **Credentials:** ANTHROPIC_API_KEY
-- **What it does:** Calls the Gmail mock to list unread emails, reads each one, writes a summary to `output/email-summary.md`
+- **Credentials:** ANTHROPIC_API_KEY, Gmail OAuth
+- **What it does:** Calls Gmail API to list unread emails, reads each one, writes a summary to `output/email-summary.md`
 
 ### pr-watcher
 - **Schedule:** Every 30 minutes
 - **MCP Server:** mcp-github on localhost:8111
 - **Output:** `%LOCALAPPDATA%/aivm/output/c3f5a7b9-2345-4bcd-aef0-222222222222/`
-- **Credentials:** ANTHROPIC_API_KEY
-- **What it does:** Calls the GitHub mock to list open PRs, writes a summary to `output/pr-summary.md`
+- **Credentials:** ANTHROPIC_API_KEY, GITHUB_TOKEN
+- **What it does:** Calls GitHub API to list open PRs, writes a summary to `output/pr-summary.md`
 
 ### report-builder
 - **Schedule:** Cron `0 7 * * *` (07:00 daily)

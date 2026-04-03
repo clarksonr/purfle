@@ -11,7 +11,7 @@
     "algorithm": "ES256",
     "issued_at": "2026-04-01T00:00:00Z",
     "expires_at": "2027-04-01T00:00:00Z",
-    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImNvbS5jbGFya3NvbnIvcmVsZWFzZS0yMDI2In0.eyJjYXBhYmlsaXRpZXMiOlsibGxtLmNoYXQiLCJuZXR3b3JrLm91dGJvdW5kIiwiZnMud3JpdGUiXSwiZGVzY3JpcHRpb24iOiJQb2xscyBHbWFpbCBldmVyeSAxNSBtaW51dGVzIGFuZCBzdW1tYXJpemVzIG5ldyBtZXNzYWdlcyB0byBhbiBvdXRwdXQgZmlsZS4iLCJpZCI6ImIyZTRmNmE4LTEyMzQtNGFiYy05ZGVmLTExMTExMTExMTExMSIsImlkZW50aXR5Ijp7ImFsZ29yaXRobSI6IkVTMjU2IiwiYXV0aG9yIjoiY2xhcmtzb25yIiwiZW1haWwiOiJyb21hbkBleGFtcGxlLmNvbSIsImV4cGlyZXNfYXQiOiIyMDI3LTA0LTAxVDAwOjAwOjAwWiIsImlzc3VlZF9hdCI6IjIwMjYtMDQtMDFUMDA6MDA6MDBaIiwia2V5X2lkIjoiY29tLmNsYXJrc29uci9yZWxlYXNlLTIwMjYifSwibGlmZWN5Y2xlIjp7Im9uX2Vycm9yIjoibG9nIn0sIm5hbWUiOiJFbWFpbCBNb25pdG9yIiwicGVybWlzc2lvbnMiOnsiZnMud3JpdGUiOnsicGF0aHMiOlsiLi9vdXRwdXQiXX0sIm5ldHdvcmsub3V0Ym91bmQiOnsiaG9zdHMiOlsibG9jYWxob3N0OjgxMDIiLCJnbWFpbC5nb29nbGVhcGlzLmNvbSJdfX0sInB1cmZsZSI6IjAuMSIsInJ1bnRpbWUiOnsiZW5naW5lIjoiYW50aHJvcGljIiwibWF4X3Rva2VucyI6MTAyNCwibW9kZWwiOiJjbGF1ZGUtc29ubmV0LTQtMjAyNTA1MTQiLCJyZXF1aXJlcyI6InB1cmZsZS8wLjEifSwic2NoZWR1bGUiOnsiaW50ZXJ2YWxfbWludXRlcyI6MTUsInRyaWdnZXIiOiJpbnRlcnZhbCJ9LCJ0b29scyI6W3siZGVzY3JpcHRpb24iOiJMaXN0IHJlY2VudCBlbWFpbHMgZnJvbSBHbWFpbCBpbmJveCIsIm5hbWUiOiJlbWFpbF9saXN0Iiwic2VydmVyIjoiaHR0cDovL2xvY2FsaG9zdDo4MTAyIn0seyJkZXNjcmlwdGlvbiI6IlJlYWQgZnVsbCBlbWFpbCBib2R5IGJ5IG1lc3NhZ2UgSUQiLCJuYW1lIjoiZW1haWxfcmVhZCIsInNlcnZlciI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODEwMiJ9XSwidmVyc2lvbiI6IjEuMC4wIn0.5JSXeXFWFQvYyPKwhb3BxhsdXEPGE-EnwggMHUjGSd0aERB5flH4_FgptfpkSPjsOM-tcgMN79oFlj-KkWJDPw"
+    "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImNvbS5jbGFya3NvbnIvcmVsZWFzZS0yMDI2In0.eyJjYXBhYmlsaXRpZXMiOlsibGxtLmNoYXQiLCJuZXR3b3JrLm91dGJvdW5kIiwiZnMud3JpdGUiXSwiZGVzY3JpcHRpb24iOiJQb2xscyBHbWFpbCBldmVyeSAxNSBtaW51dGVzIGFuZCBzdW1tYXJpemVzIG5ldyBtZXNzYWdlcyB0byBhbiBvdXRwdXQgZmlsZS4iLCJpZCI6ImIyZTRmNmE4LTEyMzQtNGFiYy05ZGVmLTExMTExMTExMTExMSIsImlkZW50aXR5Ijp7ImFsZ29yaXRobSI6IkVTMjU2IiwiYXV0aG9yIjoiY2xhcmtzb25yIiwiZW1haWwiOiJyb21hbkBleGFtcGxlLmNvbSIsImV4cGlyZXNfYXQiOiIyMDI3LTA0LTAxVDAwOjAwOjAwWiIsImlzc3VlZF9hdCI6IjIwMjYtMDQtMDFUMDA6MDA6MDBaIiwia2V5X2lkIjoiY29tLmNsYXJrc29uci9yZWxlYXNlLTIwMjYifSwibGlmZWN5Y2xlIjp7Im9uX2Vycm9yIjoibG9nIn0sIm5hbWUiOiJFbWFpbCBNb25pdG9yIiwicGVybWlzc2lvbnMiOnsiZnMud3JpdGUiOnsicGF0aHMiOlsiLi9vdXRwdXQiXX0sIm5ldHdvcmsub3V0Ym91bmQiOnsiaG9zdHMiOlsibG9jYWxob3N0OjgxMDIiLCJnbWFpbC5nb29nbGVhcGlzLmNvbSJdfX0sInB1cmZsZSI6IjAuMSIsInJ1bnRpbWUiOnsiZW5naW5lIjoiYW50aHJvcGljIiwibWF4X3Rva2VucyI6MTAyNCwibW9kZWwiOiJjbGF1ZGUtc29ubmV0LTQtMjAyNTA1MTQiLCJyZXF1aXJlcyI6InB1cmZsZS8wLjEifSwic2NoZWR1bGUiOnsiaW50ZXJ2YWxfbWludXRlcyI6MTUsInRyaWdnZXIiOiJpbnRlcnZhbCJ9LCJ0b29scyI6W3siZGVzY3JpcHRpb24iOiJMaXN0IHJlY2VudCBlbWFpbHMgZnJvbSBHbWFpbCBpbmJveCAocGFyYW1zOiBtYXhSZXN1bHRzLCBxdWVyeSwgdW5yZWFkT25seSkiLCJuYW1lIjoibGlzdF9tZXNzYWdlcyIsInNlcnZlciI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODEwMiJ9LHsiZGVzY3JpcHRpb24iOiJSZWFkIGZ1bGwgZW1haWwgYm9keSBhbmQgaGVhZGVycyBieSBtZXNzYWdlIElEIChwYXJhbXM6IGlkKSIsIm5hbWUiOiJnZXRfbWVzc2FnZSIsInNlcnZlciI6Imh0dHA6Ly9sb2NhbGhvc3Q6ODEwMiJ9LHsiZGVzY3JpcHRpb24iOiJTZWFyY2ggZW1haWxzIGJ5IHF1ZXJ5IHN0cmluZyAocGFyYW1zOiBxdWVyeSkiLCJuYW1lIjoic2VhcmNoX21lc3NhZ2VzIiwic2VydmVyIjoiaHR0cDovL2xvY2FsaG9zdDo4MTAyIn1dLCJ2ZXJzaW9uIjoiMS4wLjAifQ.sqWLulvRHet1maopqjIA6fXvEdeOILLqvqcsWR5mWgkQ8MzGHbyXuUku9hJy7FrJm3tO6pqdgp-200uSTtAKag"
   },
   "capabilities": [
     "llm.chat",
@@ -46,14 +46,19 @@
   },
   "tools": [
     {
-      "name": "email_list",
+      "name": "list_messages",
       "server": "http://localhost:8102",
-      "description": "List recent emails from Gmail inbox"
+      "description": "List recent emails from Gmail inbox (params: maxResults, query, unreadOnly)"
     },
     {
-      "name": "email_read",
+      "name": "get_message",
       "server": "http://localhost:8102",
-      "description": "Read full email body by message ID"
+      "description": "Read full email body and headers by message ID (params: id)"
+    },
+    {
+      "name": "search_messages",
+      "server": "http://localhost:8102",
+      "description": "Search emails by query string (params: query)"
     }
   ]
 }

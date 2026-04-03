@@ -129,8 +129,26 @@ export async function setupCommand(): Promise<void> {
     }
   }
 
-  // 5. Validate agent manifests
-  heading("5. Agent Manifests");
+  // 5. GitHub token
+  heading("5. GitHub Token");
+
+  const githubToken = process.env.GITHUB_TOKEN;
+  const githubTokenPath = join(".", "..", ".purfle", "github-token");
+  const homeGithubPath = join(process.env.HOME ?? process.env.USERPROFILE ?? "~", ".purfle", "github-token");
+
+  if (githubToken) {
+    ok(`GITHUB_TOKEN: set (${githubToken.slice(0, 8)}...)`);
+  } else if (existsSync(homeGithubPath)) {
+    ok(`GitHub token found at ~/.purfle/github-token`);
+  } else {
+    warn("GitHub token not configured.");
+    console.log("    Set GITHUB_TOKEN env var, or create ~/.purfle/github-token");
+    console.log("    Required scope: repo (read PR list, get PR detail, list reviews)");
+    console.log("    Generate at: https://github.com/settings/tokens");
+  }
+
+  // 6. Validate agent manifests
+  heading("6. Agent Manifests");
 
   const agentsDir = "agents";
   if (existsSync(agentsDir)) {
