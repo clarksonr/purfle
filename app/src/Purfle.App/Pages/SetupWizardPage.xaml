@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Purfle.App.Pages.SetupWizardPage"
+             Title="Welcome to Purfle"
+             Shell.NavBarIsVisible="False">
+
+    <Grid RowDefinitions="*,Auto" Padding="24">
+
+        <!-- Step 1: Welcome -->
+        <ScrollView x:Name="Step1" IsVisible="True">
+            <VerticalStackLayout Spacing="16" VerticalOptions="Center">
+                <Label Text="Welcome to Purfle"
+                       FontSize="28"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center" />
+                <Label Text="Purfle is your AI agent desktop — it runs agents in the background on a schedule, sandboxed and unattended. Each agent has declared permissions so you always know what it can do."
+                       FontSize="15"
+                       HorizontalTextAlignment="Center"
+                       TextColor="Gray" />
+                <Label Text="Let's get you set up. This takes about 2 minutes."
+                       FontSize="14"
+                       HorizontalTextAlignment="Center"
+                       Margin="0,12,0,0" />
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Step 2: LLM Engine -->
+        <ScrollView x:Name="Step2" IsVisible="False">
+            <VerticalStackLayout Spacing="16">
+                <Label Text="Choose Your LLM Engine"
+                       FontSize="24"
+                       FontAttributes="Bold" />
+                <Label Text="Agents need an LLM to reason. Pick the engine you want to use and enter your API key."
+                       FontSize="14"
+                       TextColor="Gray" />
+
+                <Label Text="Engine" FontSize="14" FontAttributes="Bold" Margin="0,8,0,0" />
+                <Picker x:Name="EnginePicker">
+                    <Picker.Items>
+                        <x:String>Anthropic (Claude)</x:String>
+                        <x:String>OpenAI (GPT)</x:String>
+                        <x:String>Google Gemini</x:String>
+                        <x:String>Ollama (local — no API key needed)</x:String>
+                    </Picker.Items>
+                </Picker>
+
+                <Label x:Name="ApiKeyLabel" Text="API Key" FontSize="14" FontAttributes="Bold" Margin="0,8,0,0" />
+                <Entry x:Name="ApiKeyEntry"
+                       Placeholder="Paste your API key here"
+                       IsPassword="True" />
+                <Label x:Name="OllamaNote"
+                       Text="Ollama runs locally — make sure it is installed and running at localhost:11434."
+                       FontSize="12"
+                       TextColor="Gray"
+                       IsVisible="False" />
+
+                <HorizontalStackLayout Spacing="8" Margin="0,8,0,0">
+                    <Button Text="Test Connection"
+                            Clicked="OnTestConnection"
+                            BackgroundColor="#5B5EA6"
+                            TextColor="White" />
+                    <ActivityIndicator x:Name="TestSpinner"
+                                       IsRunning="False"
+                                       IsVisible="False"
+                                       VerticalOptions="Center"
+                                       HeightRequest="20"
+                                       WidthRequest="20" />
+                </HorizontalStackLayout>
+                <Label x:Name="TestResultLabel"
+                       Text=""
+                       FontSize="12" />
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Step 3: Install First Agent -->
+        <ScrollView x:Name="Step3" IsVisible="False">
+            <VerticalStackLayout Spacing="16">
+                <Label Text="Install Your First Agent"
+                       FontSize="24"
+                       FontAttributes="Bold" />
+                <Label Text="Agents run on a schedule and do work for you. Pick how you want to install one."
+                       FontSize="14"
+                       TextColor="Gray" />
+
+                <Button Text="Browse the Marketplace"
+                        Clicked="OnBrowseMarketplace"
+                        BackgroundColor="#1a1a2e"
+                        TextColor="White"
+                        Margin="0,8,0,0" />
+
+                <Label Text="— or —"
+                       HorizontalTextAlignment="Center"
+                       TextColor="Gray"
+                       FontSize="13" />
+
+                <Button Text="Install from File (.purfle)"
+                        Clicked="OnInstallFromFile"
+                        BackgroundColor="#5B5EA6"
+                        TextColor="White" />
+
+                <BoxView HeightRequest="1" Color="LightGray" Margin="0,12" />
+
+                <Label Text="Featured Agents"
+                       FontSize="16"
+                       FontAttributes="Bold" />
+
+                <Frame BorderColor="LightGray" Padding="12" CornerRadius="8">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Email Monitor" FontAttributes="Bold" />
+                        <Label Text="Polls Gmail every 15 minutes, summarizes new mail" FontSize="13" TextColor="Gray" />
+                        <Button Text="Install"
+                                Clicked="OnInstallFeatured"
+                                CommandParameter="email-monitor"
+                                BackgroundColor="#1a1a2e"
+                                TextColor="White"
+                                HeightRequest="36"
+                                FontSize="13" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Frame BorderColor="LightGray" Padding="12" CornerRadius="8">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="PR Watcher" FontAttributes="Bold" />
+                        <Label Text="Checks GitHub every 30 minutes for new pull requests" FontSize="13" TextColor="Gray" />
+                        <Button Text="Install"
+                                Clicked="OnInstallFeatured"
+                                CommandParameter="pr-watcher"
+                                BackgroundColor="#1a1a2e"
+                                TextColor="White"
+                                HeightRequest="36"
+                                FontSize="13" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Frame BorderColor="LightGray" Padding="12" CornerRadius="8">
+                    <VerticalStackLayout Spacing="4">
+                        <Label Text="Report Builder" FontAttributes="Bold" />
+                        <Label Text="Runs daily at 07:00, reads agent outputs, writes a morning report" FontSize="13" TextColor="Gray" />
+                        <Button Text="Install"
+                                Clicked="OnInstallFeatured"
+                                CommandParameter="report-builder"
+                                BackgroundColor="#1a1a2e"
+                                TextColor="White"
+                                HeightRequest="36"
+                                FontSize="13" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <Label x:Name="InstallStatusLabel"
+                       Text=""
+                       FontSize="12" />
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Step 4: Ready -->
+        <ScrollView x:Name="Step4" IsVisible="False">
+            <VerticalStackLayout Spacing="16" VerticalOptions="Center">
+                <Label Text="You're All Set!"
+                       FontSize="28"
+                       FontAttributes="Bold"
+                       HorizontalOptions="Center" />
+
+                <Label x:Name="SummaryLabel"
+                       Text=""
+                       FontSize="15"
+                       HorizontalTextAlignment="Center"
+                       TextColor="Gray" />
+
+                <Button Text="Open Dashboard"
+                        Clicked="OnOpenDashboard"
+                        BackgroundColor="#1a1a2e"
+                        TextColor="White"
+                        HorizontalOptions="Center"
+                        Margin="0,16,0,0" />
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Navigation buttons -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*" Padding="0,16,0,0">
+            <Button x:Name="BackButton"
+                    Text="Back"
+                    Clicked="OnBack"
+                    BackgroundColor="Transparent"
+                    TextColor="#5B5EA6"
+                    IsVisible="False"
+                    HorizontalOptions="Start" />
+
+            <Label x:Name="StepIndicator"
+                   Text="Step 1 of 4"
+                   Grid.Column="1"
+                   VerticalOptions="Center"
+                   TextColor="Gray"
+                   FontSize="13" />
+
+            <Button x:Name="NextButton"
+                    Text="Get Started"
+                    Grid.Column="2"
+                    Clicked="OnNext"
+                    BackgroundColor="#1a1a2e"
+                    TextColor="White"
+                    HorizontalOptions="End" />
+        </Grid>
+
+    </Grid>
+
+</ContentPage>

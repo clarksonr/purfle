@@ -299,6 +299,16 @@ public partial class SettingsPage : ContentPage
         }
     }
 
+    private async void OnResetSetup(object? sender, EventArgs e)
+    {
+        bool confirm = await DisplayAlertAsync("Reset Setup",
+            "This will re-run the setup wizard on next launch.", "Reset", "Cancel");
+        if (!confirm) return;
+
+        Preferences.Set("setup_complete", false);
+        await Shell.Current.GoToAsync("SetupWizardPage");
+    }
+
     private static string GenerateCodeChallenge(out string codeVerifier)
     {
         var bytes = new byte[32];

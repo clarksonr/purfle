@@ -5,8 +5,10 @@ public partial class AppShell : Shell
     public AppShell()
     {
         InitializeComponent();
-        Routing.RegisterRoute("AgentDetailPage", typeof(Pages.AgentDetailPage));
-        Routing.RegisterRoute("AgentRunPage",    typeof(Pages.AgentRunPage));
-        Routing.RegisterRoute("LogViewPage",     typeof(Pages.LogViewPage));
+        Routing.RegisterRoute("AgentDetailPage",  typeof(Pages.AgentDetailPage));
+        Routing.RegisterRoute("AgentRunPage",     typeof(Pages.AgentRunPage));
+        Routing.RegisterRoute("LogViewPage",      typeof(Pages.LogViewPage));
+        Routing.RegisterRoute("SetupWizardPage",  typeof(Pages.SetupWizardPage));
+        Routing.RegisterRoute("ConsentPage",      typeof(Pages.ConsentPage));
     }
 }

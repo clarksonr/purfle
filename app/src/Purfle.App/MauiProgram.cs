@@ -81,6 +81,8 @@ public static class MauiProgram
         builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddTransient<AgentRunPage>();
         builder.Services.AddTransient<LogViewPage>();
+        builder.Services.AddTransient<SetupWizardPage>();
+        builder.Services.AddTransient<ConsentPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Purfle.App;
 
@@ -11,6 +11,18 @@ public partial class App : Application
 
 	protected override Window CreateWindow(IActivationState? activationState)
 	{
-		return new Window(new AppShell());
+		var shell = new AppShell();
+		var window = new Window(shell);
+
+		shell.Navigated += async (s, e) =>
+		{
+			if (!Preferences.Get("setup_complete", false))
+			{
+				shell.Navigated -= null!; // one-shot
+				await shell.GoToAsync("SetupWizardPage");
+			}
+		};
+
+		return window;
 	}
 }
