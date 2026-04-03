@@ -1,126 +1,198 @@
 # Contributing to Purfle
 
-Purfle is an early-stage open source project. Contributions are welcome — code, spec feedback, bug reports, and documentation improvements all matter at this stage.
+Thank you for your interest in contributing to Purfle. This document covers everything you need to get started: building, testing, branching, and submitting changes.
 
 ---
 
-## What's Most Useful Right Now
+## 1. Prerequisites
 
-The project is in phase 2/3. The areas where outside help has the most impact:
+You need the following installed before you begin:
 
-- **Spec review** — read `spec/SPEC.md` and the RFCs; open an issue if anything is ambiguous, underspecified, or wrong
-- **Runtime adapter implementations** — the AIVM is .NET/C#; adapters for other runtimes (OpenClaw, Ollama) are stubbed and need implementation
-- **TypeScript SDK** — `purfle simulate` and `purfle publish` commands are incomplete; see `sdk/packages/cli/src/commands/`
-- **Test coverage** — the runtime has 82 passing tests; gaps are documented in `CLAUDE.md`
-- **Documentation** — if something is unclear, a PR to improve it is as valuable as a code PR
+| Tool | Minimum version | Check command |
+|---|---|---|
+| .NET SDK | 8.0 | `dotnet --version` |
+| Node.js | 18.0 | `node --version` |
+| npm | 9.0 | `npm --version` |
+| Git | 2.30 | `git --version` |
+
+Ensure all four commands return a version at or above the minimum before proceeding.
 
 ---
 
-## Getting Started
+## 2. Clone and Build
 
-### Prerequisites
-
-| Tool | Version |
-|---|---|
-| .NET SDK | 9.0+ |
-| Node.js | 20+ |
-| npm | 10+ |
-
-### Clone and build
+Clone the repository:
 
 ```bash
 git clone https://github.com/clarksonr/purfle.git
 cd purfle
 ```
 
-**Runtime (.NET):**
+Build the .NET solution (runtime, desktop app, tests):
+
 ```bash
-cd runtime
-dotnet restore
-dotnet build
-dotnet test
+dotnet build src/Purfle.sln
 ```
 
-**SDK (TypeScript):**
+Build the SDK and CLI (TypeScript):
+
 ```bash
 cd sdk
 npm install
 npm run build
-npm test
 ```
 
-### Running the CLI
+Both builds must complete without errors before you submit a pull request.
+
+---
+
+## 3. Running Tests
+
+### .NET unit tests
+
+```bash
+dotnet test src/Purfle.sln
+```
+
+### .NET integration tests
+
+```bash
+dotnet test tests/Purfle.IntegrationTests/
+```
+
+### SDK and CLI tests (Jest)
 
 ```bash
 cd sdk
-npm run build
-node packages/cli/src/index.js --help
+npm test
 ```
 
-To simulate an agent end-to-end (requires an Anthropic API key):
+### Run a specific test by name
+
+.NET:
 
 ```bash
+dotnet test src/Purfle.sln --filter "FullyQualifiedName~YourTestName"
+```
+
+Jest:
+
+```bash
+cd sdk
+npx jest --testNamePattern "your test name"
+```
+
+All tests must pass before you open a pull request.
+
+---
+
+## 4. Running the Demo
+
+The `purfle demo` command starts local MCP servers and runs the dogfood agents:
+
+```bash
+purfle demo
+```
+
+Then open the desktop app to see agents running in the dashboard.
+
+You need at least one LLM engine API key set as an environment variable. The current developer preference is Gemini:
+
+```bash
+# Pick one (or more) depending on which engine your agents use:
+export GEMINI_API_KEY=your-key-here
 export ANTHROPIC_API_KEY=your-key-here
-node packages/cli/src/index.js simulate ../spec/examples/assistant.agent.json
+export OPENAI_API_KEY=your-key-here
+# Ollama requires no key — just a running Ollama instance on localhost:11434
 ```
 
 ---
 
-## How to Contribute
+## 5. Branching
 
-### Reporting bugs
-
-Open a GitHub issue. Include the manifest JSON if relevant, the error output, and the runtime version (`dotnet --version`, Node version).
-
-### Suggesting spec changes
-
-Spec changes are significant. Open an issue first to discuss before writing code. If the change is substantial, a new RFC in `spec/rfcs/` is the right format — follow the structure of `0001-identity-model.md`.
-
-### Submitting a pull request
-
-1. Fork the repo and create a branch from `main`
-2. Make your changes
-3. Run the relevant tests — `dotnet test` for runtime changes, `npm test` for SDK changes
-4. Open a PR with a clear description of what changed and why
-
-Keep PRs focused. One logical change per PR is easier to review than a batch of unrelated fixes.
+- `main` is the stable branch. All pull requests target `main`.
+- Create feature branches off `main`. Use descriptive names: `feat/cross-agent-sharing`, `fix/scheduler-crash`, `docs/agent-authoring`.
+- Pull request titles must follow conventional commit format (see Section 6).
+- Rebase on `main` before requesting review if your branch has fallen behind.
 
 ---
 
-## Project Structure
+## 6. Commit Messages
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/).
+
+**Format:**
 
 ```
-purfle/
-├── spec/        ← The manifest specification — JSON Schema, RFCs, examples
-├── runtime/     ← .NET / C# AIVM core — the enforcement host
-├── app/         ← .NET MAUI desktop app
-├── sdk/         ← TypeScript CLI and core library
-├── docs/        ← Architecture and roadmap
+type(scope): short description
 ```
 
-The spec is the source of truth. Runtime and SDK must conform to it, not the other way around.
+**Types:**
+
+| Type | When to use |
+|---|---|
+| `feat` | A new feature or capability |
+| `fix` | A bug fix |
+| `chore` | Maintenance, dependency updates, CI changes |
+| `test` | Adding or updating tests |
+| `docs` | Documentation changes |
+| `refactor` | Code restructuring without behavior change |
+
+**Scopes:**
+
+| Scope | Covers |
+|---|---|
+| `runtime` | AIVM, agent loader, sandbox, scheduler, adapters |
+| `sdk` | TypeScript SDK and CLI |
+| `desktop` | .NET MAUI desktop app and UI |
+| `spec` | Manifest schema, RFCs, specification documents |
+| `docs` | Documentation files |
+| `integration` | Integration tests |
+
+**Examples:**
+
+```
+feat(runtime): add cross-agent output reader
+fix(sdk): correct SHA-256 hash comparison in install
+chore(desktop): update MAUI workload to 8.0.40
+test(runtime): add scheduler overlap-skip tests
+docs(spec): RFC 0003 cross-agent output sharing
+refactor(sdk): extract manifest validation into shared module
+```
 
 ---
 
-## Design Principles
+## 7. CI Requirements
 
-A few things that guide decisions in this project:
+The CI pipeline runs on every pull request. Your PR must satisfy all of the following:
 
-- **The AIVM is a VM, not a framework.** It enforces boundaries; it does not provide agent behavior.
-- **The manifest is the contract.** Everything the AIVM needs to know about an agent is in the manifest. Nothing is inferred at runtime.
-- **Deny by default.** The sandbox denies everything not explicitly permitted. This is not configurable.
-- **No over-engineering.** Abstractions should address real, current needs — not hypothetical future requirements.
-- **MCP is a tool protocol, not the packaging model.** Agents are signed .NET assembly bundles. MCP is how the AIVM wires tools to the LLM. These are different things.
-
-If a proposed change conflicts with these principles, expect pushback.
+1. **All .NET tests pass.** Unit tests and integration tests.
+2. **All SDK tests pass.** Jest test suite.
+3. **No `PLACEHOLDER_` values.** Never hardcode placeholder strings. Use the `PLACEHOLDER_*` string as-is if the real value is not yet available.
+4. **No hardcoded engine names.** The runtime is engine-agnostic. Never assume, default, or prefer any specific LLM engine (Gemini, Anthropic, OpenAI, Ollama) in code, tests, or documentation. Always derive the engine from `runtime.engine` in the agent manifest.
+5. **Build succeeds.** Both `dotnet build` and `npm run build` must complete without errors.
 
 ---
 
-## Code Style
+## 8. Creating an Agent
 
-**.NET / C#:** Standard C# conventions. No custom formatter config — just keep it consistent with the surrounding code.
+For a complete walkthrough of authoring, building, signing, and publishing a Purfle agent, see:
 
-**TypeScript:** The SDK uses strict TypeScript. Run `tsc --noEmit` before submitting.
+**[docs/AGENT_AUTHORING.md](docs/AGENT_AUTHORING.md)**
+
+That guide covers the full lifecycle from `purfle init` through `purfle publish`, including manifest structure, engine selection, security scanning, and troubleshooting.
+
+---
+
+## 9. Code of Conduct
+
+- Be respectful and constructive in all interactions.
+- Focus feedback on the work, not the person.
+- Assume good intent. Ask clarifying questions before drawing conclusions.
+- No harassment, discrimination, or personal attacks of any kind.
+- If you see a problem, report it. If you can fix it, submit a pull request.
+
+We are building software that runs autonomously on people's machines. That responsibility demands careful, honest, collaborative work. Hold yourself and others to that standard.
 
 ---
 
