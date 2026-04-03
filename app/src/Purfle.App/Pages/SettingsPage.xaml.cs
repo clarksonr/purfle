@@ -1,5 +1,7 @@
 using System.Reflection;
 using Purfle.App.Services;
+using Purfle.App.ViewModels;
+using Purfle.Runtime.Auth;
 
 namespace Purfle.App.Pages;
 
@@ -7,16 +9,23 @@ public partial class SettingsPage : ContentPage
 {
     private readonly MarketplaceService _marketplace;
     private readonly AgentStore _store;
+    private readonly ConnectedAccountsViewModel _connectedAccounts;
 
     private static readonly string s_outputBase = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "aivm", "output");
 
-    public SettingsPage(MarketplaceService marketplace, AgentStore store)
+    public SettingsPage(
+        MarketplaceService marketplace,
+        AgentStore store,
+        IAuthProfileStore profileStore,
+        UserProviderPreferences preferences)
     {
         InitializeComponent();
         _marketplace = marketplace;
         _store = store;
+        _connectedAccounts = new ConnectedAccountsViewModel(profileStore, preferences);
+        ProvidersCollection.ItemsSource = _connectedAccounts.Providers;
     }
 
     protected override async void OnAppearing()
@@ -24,6 +33,7 @@ public partial class SettingsPage : ContentPage
         base.OnAppearing();
         LoadStats();
         await LoadApiKeyIndicators();
+        await _connectedAccounts.LoadAsync();
         LoadOutputSection();
         LoadNotificationPrefs();
         LoadAboutSection();
@@ -329,6 +339,30 @@ public partial class SettingsPage : ContentPage
         {
             await DisplayAlertAsync("Error", ex.Message, "OK");
         }
+    }
+
+    // --- Connected Accounts ---
+
+    private async void OnAddApiKey(object? sender, EventArgs e)
+    {
+        if (sender is Button btn && btn.BindingContext is ProviderAccountItem item)
+        {
+            await _connectedAccounts.AddApiKeyAsync(item.Provider);
+        }
+    }
+
+    private async void OnRemoveProfile(object? sender, EventArgs e)
+    {
+        if (sender is Button btn && btn.BindingContext is ProviderAccountItem item &&
+            item.ActiveProfile != null)
+        {
+            await _connectedAccounts.RemoveProfileAsync(item.ActiveProfile.ProfileId);
+        }
+    }
+
+    private async void OnReorderCompleted(object? sender, EventArgs e)
+    {
+        await _connectedAccounts.SaveReorderAsync();
     }
 
     // --- Stats ---

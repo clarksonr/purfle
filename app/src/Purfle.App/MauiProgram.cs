@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging;
 using Purfle.App.Pages;
 using Purfle.App.Services;
 using Purfle.App.ViewModels;
+using Purfle.Runtime.Auth;
 using Purfle.Runtime.Identity;
+using Purfle.Runtime.Platform;
 
 namespace Purfle.App;
 
@@ -36,6 +38,26 @@ public static class MauiProgram
                 "https://purfle-key-registry-bxa8bmejh6hhdfe0.centralus-01.azurewebsites.net"));
         builder.Services.AddSingleton<CredentialService>();
         builder.Services.AddSingleton<AgentExecutorService>();
+
+        // Auth profile services
+        builder.Services.AddSingleton<ICredentialStore>(_ => CredentialStoreFactory.Create());
+        builder.Services.AddSingleton<UserProviderPreferences>(sp =>
+        {
+            var prefs = new UserProviderPreferences();
+            prefs.LoadAsync().GetAwaiter().GetResult();
+            return prefs;
+        });
+        builder.Services.AddSingleton<AuthProfileStore>(sp =>
+        {
+            var store = new AuthProfileStore(
+                sp.GetRequiredService<ICredentialStore>(),
+                sp.GetRequiredService<ILogger<AuthProfileStore>>());
+            store.InitializeAsync().GetAwaiter().GetResult();
+            store.SeedFromEnvironmentAsync().GetAwaiter().GetResult();
+            return store;
+        });
+        builder.Services.AddSingleton<IAuthProfileStore>(sp => sp.GetRequiredService<AuthProfileStore>());
+        builder.Services.AddSingleton<ICredentialResolver, CredentialResolutionEngine>();
 
         // Scheduler — scans %LOCALAPPDATA%/aivm/agents at startup
         builder.Services.AddSingleton<Purfle.Runtime.Scheduling.Scheduler>(sp =>
