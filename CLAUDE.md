@@ -103,6 +103,8 @@ my-agent.purfle/
 - **Cross-agent output sharing:** Deferred — not in phase 1.
 - **`io` block:** Optional in schema, no enforcement in phase 1.
 - **No over-engineering:** No abstractions for hypothetical requirements.
+- **Deep link scheme:** `purfle://` — registered on Windows, macOS, iOS, Android. `purfle://install?id={id}` opens ConsentPage.
+- **Admin auth:** PURFLE_ADMIN_TOKEN env var — bearer token for all /admin routes on IdentityHub.Web.
 - **License:** MIT
 
 ---
@@ -373,6 +375,10 @@ purfle/
 - `AgentExecutorService` — uses live key registry for signature verification
 - `CredentialService` — retrieves API keys from SecureStorage with env var fallback
 - `NotificationService` — Windows toast notifications for agent completion/error
+- **Deep link:** `purfle://` URI scheme registered on Windows, macOS, iOS, Android
+  - `purfle://install?id={id}` — downloads manifest from marketplace, navigates to ConsentPage
+  - `purfle://install?url={url}` — downloads manifest from URL, navigates to ConsentPage
+  - Handled in `App.xaml.cs` via `OnAppLinkRequestReceived`
 
 **Polyglot Agents (Marathon Build — C# + TypeScript)**
 - `agents/file-assistant/` — file read/list/search/summarize (C# + TS)
@@ -410,6 +416,13 @@ purfle/
 **IdentityHub**
 - `identityhub/src/Purfle.IdentityHub.Core/` — agent registry, key revocation, trust attestations
 - `identityhub/src/Purfle.IdentityHub.Api/` — minimal API endpoints, JSON file storage
+- `identityhub/src/Purfle.IdentityHub.Web/` — public website + admin panel (ASP.NET Core, static HTML/JS/CSS)
+  - Public pages: Home (/), Agent listing (/agents), Agent detail (/agents/{id}), Publisher (/publishers/{id}), Key lookup (/keys/{id})
+  - Admin panel (/admin): Dashboard, Agent moderation, Publisher management, Key registry, Attestation manager
+  - SVG embed badge (/badge/{id}), Atom feed (/feed.xml)
+  - Proxies Marketplace API and IdentityHub API — no database of its own
+  - Admin routes protected by PURFLE_ADMIN_TOKEN bearer auth
+  - Added to runtime solution and CI matrix
 
 **Dashboard**
 - `dashboard/src/Purfle.Dashboard.Api/` — ASP.NET Core API + static HTML/JS/CSS
