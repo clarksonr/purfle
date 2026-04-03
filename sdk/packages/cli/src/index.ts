@@ -13,6 +13,7 @@ import { runCommand } from "./commands/run.js";
 import { securityScanCommand } from "./commands/security-scan.js";
 import { packCommand } from "./commands/pack.js";
 import { setupCommand } from "./commands/setup.js";
+import { demoCommand } from "./commands/demo.js";
 
 const program = new Command();
 
@@ -132,6 +133,13 @@ program
   .description("Check your development environment and configure Purfle")
   .action(async () => {
     await setupCommand();
+  });
+
+program
+  .command("demo")
+  .description("Start local MCP servers for development and demo")
+  .action(async () => {
+    await demoCommand();
   });
 
 program.parse(process.argv);
