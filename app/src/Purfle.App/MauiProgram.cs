@@ -73,8 +73,10 @@ public static class MauiProgram
 
         // ViewModels
         builder.Services.AddSingleton<MainViewModel>();
+        builder.Services.AddSingleton<DashboardViewModel>();
 
         // Pages
+        builder.Services.AddTransient<DashboardPage>();
         builder.Services.AddTransient<SearchPage>();
         builder.Services.AddTransient<AgentDetailPage>();
         builder.Services.AddTransient<MyAgentsPage>();

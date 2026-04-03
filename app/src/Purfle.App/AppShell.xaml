@@ -4,9 +4,15 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:pages="clr-namespace:Purfle.App.Pages"
-    Title="Purfle Marketplace">
+    Title="Purfle">
 
     <TabBar>
+        <ShellContent
+            Title="Dashboard"
+            Icon="{OnPlatform Default='dashboard_icon.png'}"
+            ContentTemplate="{DataTemplate pages:DashboardPage}"
+            Route="DashboardPage" />
+
         <ShellContent
             Title="Search"
             Icon="{OnPlatform Default='search_icon.png'}"
