@@ -88,6 +88,11 @@
                         <TapGestureRecognizer Tapped="OnTabSystem" />
                     </Label.GestureRecognizers>
                 </Label>
+                <Label x:Name="TabInstall" Text="Install" FontSize="14" TextColor="Gray">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnTabInstall" />
+                    </Label.GestureRecognizers>
+                </Label>
             </HorizontalStackLayout>
         </VerticalStackLayout>
 
@@ -184,6 +189,82 @@
                             FontSize="12"
                             HeightRequest="500"
                             BackgroundColor="#f5f5f5" />
+                </VerticalStackLayout>
+
+                <!-- Install tab -->
+                <VerticalStackLayout x:Name="InstallPanel" Spacing="12" IsVisible="False">
+                    <!-- Marketplace info -->
+                    <Label x:Name="InstallAgentName" FontSize="16" FontAttributes="Bold" />
+                    <Label x:Name="InstallVersion" FontSize="13" TextColor="Gray" />
+                    <Label x:Name="InstallAuthor" FontSize="13" TextColor="Gray" />
+                    <Label x:Name="InstallDescription" FontSize="13" />
+                    <Label x:Name="InstallHash" FontSize="11" FontFamily="Courier New" TextColor="Gray" />
+
+                    <!-- Offline message -->
+                    <Border x:Name="InstallOfflineBorder" Padding="12"
+                            StrokeThickness="1" Stroke="Orange"
+                            StrokeShape="RoundRectangle 6"
+                            BackgroundColor="#FFF8E1"
+                            IsVisible="False">
+                        <Label x:Name="InstallOfflineLabel"
+                               Text="Marketplace API is unreachable. Check your network connection."
+                               FontSize="13" TextColor="#E65100" />
+                    </Border>
+
+                    <!-- Install button -->
+                    <Button x:Name="InstallButton" Text="Install"
+                            Clicked="OnInstallClicked"
+                            BackgroundColor="#5B5EA6" TextColor="White"
+                            HeightRequest="40" FontSize="14" Padding="24,0"
+                            HorizontalOptions="Start" />
+
+                    <!-- Progress indicator -->
+                    <ActivityIndicator x:Name="InstallProgress"
+                                       IsRunning="False" IsVisible="False"
+                                       HorizontalOptions="Start" />
+
+                    <!-- Live CLI output -->
+                    <Border x:Name="InstallLogBorder" Padding="8"
+                            StrokeThickness="1"
+                            Stroke="{AppThemeBinding Light=#E0E0E0, Dark=#333}"
+                            StrokeShape="RoundRectangle 4"
+                            BackgroundColor="{AppThemeBinding Light=#F8F8F8, Dark=#1A1A1A}"
+                            IsVisible="False">
+                        <Editor x:Name="InstallLogEditor"
+                                IsReadOnly="True"
+                                FontFamily="Courier New"
+                                FontSize="11"
+                                HeightRequest="200"
+                                BackgroundColor="Transparent" />
+                    </Border>
+
+                    <!-- Success banner -->
+                    <Border x:Name="InstallSuccessBanner" Padding="12"
+                            StrokeThickness="1" Stroke="#4CAF50"
+                            StrokeShape="RoundRectangle 6"
+                            BackgroundColor="#E8F5E9"
+                            IsVisible="False">
+                        <Label Text="Installed successfully!"
+                               FontSize="14" TextColor="#2E7D32" FontAttributes="Bold" />
+                    </Border>
+
+                    <!-- Error box with retry -->
+                    <Border x:Name="InstallErrorBorder" Padding="12"
+                            StrokeThickness="2" Stroke="#CC0000"
+                            StrokeShape="RoundRectangle 6"
+                            BackgroundColor="#FFF0F0"
+                            IsVisible="False">
+                        <VerticalStackLayout Spacing="8">
+                            <Label x:Name="InstallErrorLabel"
+                                   FontSize="12" TextColor="#CC0000"
+                                   FontFamily="Courier New" />
+                            <Button Text="Retry"
+                                    Clicked="OnInstallClicked"
+                                    BackgroundColor="#CC0000" TextColor="White"
+                                    FontSize="12" Padding="16,4"
+                                    HorizontalOptions="Start" />
+                        </VerticalStackLayout>
+                    </Border>
                 </VerticalStackLayout>
 
             </Grid>

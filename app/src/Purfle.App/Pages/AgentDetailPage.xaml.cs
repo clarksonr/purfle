@@ -80,18 +80,21 @@ public partial class AgentDetailPage : ContentPage
         FilesPanel.IsVisible = tab == "files";
         HistoryPanel.IsVisible = tab == "history";
         SystemMdPanel.IsVisible = tab == "system";
+        InstallPanel.IsVisible = tab == "install";
 
         TabOverview.TextColor = tab == "overview" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
         TabPermissions.TextColor = tab == "permissions" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
         TabFiles.TextColor = tab == "files" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
         TabHistory.TextColor = tab == "history" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
         TabSystem.TextColor = tab == "system" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
+        TabInstall.TextColor = tab == "install" ? Color.FromArgb("#5B5EA6") : Colors.Gray;
 
         TabOverview.FontAttributes = tab == "overview" ? FontAttributes.Bold : FontAttributes.None;
         TabPermissions.FontAttributes = tab == "permissions" ? FontAttributes.Bold : FontAttributes.None;
         TabFiles.FontAttributes = tab == "files" ? FontAttributes.Bold : FontAttributes.None;
         TabHistory.FontAttributes = tab == "history" ? FontAttributes.Bold : FontAttributes.None;
         TabSystem.FontAttributes = tab == "system" ? FontAttributes.Bold : FontAttributes.None;
+        TabInstall.FontAttributes = tab == "install" ? FontAttributes.Bold : FontAttributes.None;
     }
 
     private void OnTabOverview(object? s, EventArgs e) { SelectTab("overview"); LoadOverviewTab(); }
@@ -99,6 +102,7 @@ public partial class AgentDetailPage : ContentPage
     private void OnTabFiles(object? s, EventArgs e) { SelectTab("files"); LoadFilesTab(); }
     private void OnTabHistory(object? s, EventArgs e) { SelectTab("history"); LoadHistoryTab(); }
     private void OnTabSystem(object? s, EventArgs e) { SelectTab("system"); LoadSystemMdTab(); }
+    private void OnTabInstall(object? s, EventArgs e) { SelectTab("install"); LoadInstallTab(); }
 
     // --- Overview tab ---
 
@@ -434,6 +438,139 @@ public partial class AgentDetailPage : ContentPage
                 }
             });
         }
+    }
+
+    // --- Install tab ---
+
+    private async void LoadInstallTab()
+    {
+        // Reset state
+        InstallSuccessBanner.IsVisible = false;
+        InstallErrorBorder.IsVisible = false;
+        InstallLogBorder.IsVisible = false;
+        InstallOfflineBorder.IsVisible = false;
+        InstallButton.IsEnabled = true;
+
+        try
+        {
+            var detail = await _marketplace.GetAgentAsync(AgentId);
+            if (detail is null)
+            {
+                InstallOfflineBorder.IsVisible = true;
+                InstallOfflineLabel.Text = "Agent not found in the Marketplace.";
+                InstallButton.IsEnabled = false;
+                return;
+            }
+
+            InstallAgentName.Text = detail.Name;
+            var latest = detail.Versions.Count > 0 ? detail.Versions[0] : null;
+            InstallVersion.Text = latest is not null ? $"Version: {latest.Version}" : "No versions";
+            InstallAuthor.Text = $"Author: {detail.PublisherName}";
+            InstallDescription.Text = detail.Description;
+            InstallHash.Text = latest?.BundleHash is { Length: > 0 } hash
+                ? $"SHA-256: {hash}" : "";
+        }
+        catch (HttpRequestException)
+        {
+            InstallOfflineBorder.IsVisible = true;
+            InstallButton.IsEnabled = false;
+        }
+        catch (TaskCanceledException)
+        {
+            InstallOfflineBorder.IsVisible = true;
+            InstallButton.IsEnabled = false;
+        }
+    }
+
+    private async void OnInstallClicked(object? sender, EventArgs e)
+    {
+        InstallButton.IsEnabled = false;
+        InstallProgress.IsRunning = true;
+        InstallProgress.IsVisible = true;
+        InstallLogBorder.IsVisible = true;
+        InstallLogEditor.Text = "";
+        InstallSuccessBanner.IsVisible = false;
+        InstallErrorBorder.IsVisible = false;
+
+        try
+        {
+            var purfleCliPath = FindPurfleCli();
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = purfleCliPath,
+                Arguments = $"install {AgentId}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var process = new System.Diagnostics.Process { StartInfo = psi };
+            var output = new System.Text.StringBuilder();
+
+            process.OutputDataReceived += (_, args) =>
+            {
+                if (args.Data is null) return;
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    output.AppendLine(args.Data);
+                    InstallLogEditor.Text = output.ToString();
+                });
+            };
+            process.ErrorDataReceived += (_, args) =>
+            {
+                if (args.Data is null) return;
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    output.AppendLine(args.Data);
+                    InstallLogEditor.Text = output.ToString();
+                });
+            };
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            await process.WaitForExitAsync();
+
+            InstallProgress.IsRunning = false;
+            InstallProgress.IsVisible = false;
+
+            if (process.ExitCode == 0)
+            {
+                InstallSuccessBanner.IsVisible = true;
+                // Reload agent list
+                LoadAgent();
+            }
+            else
+            {
+                InstallErrorBorder.IsVisible = true;
+                InstallErrorLabel.Text = output.ToString();
+                InstallButton.IsEnabled = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            InstallProgress.IsRunning = false;
+            InstallProgress.IsVisible = false;
+            InstallErrorBorder.IsVisible = true;
+            InstallErrorLabel.Text = ex.Message;
+            InstallButton.IsEnabled = true;
+        }
+    }
+
+    private static string FindPurfleCli()
+    {
+        // Look for purfle CLI in PATH or common locations
+        if (OperatingSystem.IsWindows())
+        {
+            var npmGlobal = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "npm", "purfle.cmd");
+            if (File.Exists(npmGlobal)) return npmGlobal;
+        }
+
+        // Default: assume it's on PATH
+        return "purfle";
     }
 
     // --- Helpers ---
