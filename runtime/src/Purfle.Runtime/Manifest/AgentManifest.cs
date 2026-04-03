@@ -87,6 +87,10 @@ public sealed record RuntimeBlock
 
     [JsonPropertyName("max_tokens")]
     public int? MaxTokens { get; init; }
+
+    /// <summary>Ordered list of fallback engines if preferred engine is unavailable.</summary>
+    [JsonPropertyName("engine_fallback")]
+    public IReadOnlyList<string>? EngineFallback { get; init; }
 }
 
 public sealed record LifecycleBlock

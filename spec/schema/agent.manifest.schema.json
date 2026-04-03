@@ -316,6 +316,15 @@
           "type": "integer",
           "description": "Maximum tokens the model may generate per turn.",
           "minimum": 1
+        },
+        "engine_fallback": {
+          "type": "array",
+          "description": "Ordered list of fallback engines if preferred engine unavailable.",
+          "items": {
+            "type": "string",
+            "enum": ["gemini", "anthropic", "openai", "ollama"]
+          },
+          "uniqueItems": true
         }
       }
     },
