@@ -1,170 +1,229 @@
 import express, { Request, Response } from "express";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 
 const app = express();
 app.use(express.json());
 
 const PORT = 8111;
+const GITHUB_API = "https://api.github.com";
 
-// --- Mock data ---
+// --- Token resolution ---
 
-const mockPulls = [
-  {
-    number: 42,
-    title: "feat(runtime): add exponential backoff for LLM retries",
-    state: "open",
-    user: { login: "clarksonr", avatar_url: "" },
-    created_at: "2026-04-01T14:30:00Z",
-    updated_at: "2026-04-01T16:45:00Z",
-    labels: [{ name: "enhancement" }, { name: "runtime" }],
-    body: "Adds exponential backoff with jitter for HTTP 429 and timeout responses from the LLM API. Starts at 1s, caps at 60s.",
-    head: { ref: "feat/llm-backoff" },
-    base: { ref: "main" },
-    draft: false,
-    additions: 87,
-    deletions: 12,
-    changed_files: 3,
-    mergeable: true,
-    files: [
-      { filename: "runtime/src/Purfle.Runtime.Anthropic/AnthropicAdapter.cs", additions: 45, deletions: 8 },
-      { filename: "runtime/tests/Purfle.Runtime.Tests/AnthropicAdapterTests.cs", additions: 38, deletions: 2 },
-      { filename: "docs/TROUBLESHOOTING.md", additions: 4, deletions: 2 },
-    ],
-  },
-  {
-    number: 41,
-    title: "fix(sandbox): block symlink traversal outside sandbox root",
-    state: "open",
-    user: { login: "elena-k", avatar_url: "" },
-    created_at: "2026-04-01T10:15:00Z",
-    updated_at: "2026-04-01T11:00:00Z",
-    labels: [{ name: "security" }, { name: "sandbox" }],
-    body: "Resolves symlinks to their real path before checking sandbox bounds. Prevents directory traversal via symlink chains.",
-    head: { ref: "fix/symlink-sandbox" },
-    base: { ref: "main" },
-    draft: false,
-    additions: 34,
-    deletions: 5,
-    changed_files: 2,
-    mergeable: true,
-    files: [
-      { filename: "runtime/src/Purfle.Runtime/Sandbox/AgentSandbox.cs", additions: 28, deletions: 3 },
-      { filename: "runtime/tests/Purfle.Runtime.Tests/SandboxTests.cs", additions: 6, deletions: 2 },
-    ],
-  },
-  {
-    number: 40,
-    title: "chore(deps): bump Anthropic SDK to 1.4.0",
-    state: "open",
-    user: { login: "dependabot[bot]", avatar_url: "" },
-    created_at: "2026-03-31T06:00:00Z",
-    updated_at: "2026-03-31T06:00:00Z",
-    labels: [{ name: "dependencies" }],
-    body: "Bumps the Anthropic SDK from 1.3.2 to 1.4.0.\n\n### Changelog\n- Added streaming support for tool use\n- Fixed token counting for multi-turn conversations",
-    head: { ref: "dependabot/nuget/anthropic-sdk-1.4.0" },
-    base: { ref: "main" },
-    draft: false,
-    additions: 3,
-    deletions: 3,
-    changed_files: 1,
-    mergeable: true,
-    files: [
-      { filename: "runtime/src/Purfle.Runtime.Anthropic/Purfle.Runtime.Anthropic.csproj", additions: 3, deletions: 3 },
-    ],
-  },
-  {
-    number: 39,
-    title: "feat(ui): add dark mode toggle to settings page",
-    state: "closed",
-    user: { login: "marcus-r", avatar_url: "" },
-    created_at: "2026-03-30T09:00:00Z",
-    updated_at: "2026-03-31T14:00:00Z",
-    labels: [{ name: "ui" }],
-    body: "Adds a dark mode toggle to the Settings page. Persists preference via MAUI Preferences API.",
-    head: { ref: "feat/dark-mode" },
-    base: { ref: "main" },
-    draft: false,
-    additions: 62,
-    deletions: 8,
-    changed_files: 4,
-    mergeable: true,
-    files: [],
-  },
-];
+function getGitHubToken(): string | null {
+  // 1. Environment variable
+  if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
+
+  // 2. Purfle credential store
+  const credPath = join(homedir(), ".purfle", "github-token");
+  if (existsSync(credPath)) {
+    return readFileSync(credPath, "utf8").trim();
+  }
+
+  return null;
+}
+
+function requireToken(res: Response): string | null {
+  const token = getGitHubToken();
+  if (!token) {
+    res.status(401).json({
+      error: "GitHub token not configured.",
+      help: "Set GITHUB_TOKEN env var or run: purfle setup (stores token in ~/.purfle/github-token)",
+    });
+    return null;
+  }
+  return token;
+}
+
+async function githubFetch(path: string, token: string): Promise<globalThis.Response> {
+  return fetch(`${GITHUB_API}${path}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github.v3+json",
+      "User-Agent": "purfle-mcp-github/1.0.0",
+    },
+  });
+}
 
 // --- Health check ---
 
 app.get("/", (_req: Request, res: Response) => {
+  const hasToken = !!getGitHubToken();
   res.json({
     name: "@purfle/mcp-github",
-    version: "1.0.0",
-    status: "ok",
-    provider: "GitHub API (simulated)",
-    tools: ["github/pulls", "github/pulls/:number"],
+    version: "2.0.0",
+    status: hasToken ? "ok" : "no-token",
+    provider: "GitHub API",
+    tools: [
+      "github/pulls (list_pull_requests)",
+      "github/pulls/:number (get_pull_request)",
+      "github/pulls/:number/reviews (list_reviews)",
+    ],
   });
 });
 
-// --- Tool endpoints (GET + POST) ---
+// --- list_pull_requests ---
 
-app.get("/tools/github/pulls", (req: Request, res: Response) => {
+app.get("/tools/github/pulls", async (req: Request, res: Response) => {
+  const token = requireToken(res);
+  if (!token) return;
+
+  const owner = req.query.owner as string;
+  const repo = req.query.repo as string;
   const state = (req.query.state as string) ?? "open";
-  const results = mockPulls.filter((p) => state === "all" || p.state === state);
 
-  res.json({
-    tool: "github/pulls",
-    provider: "github",
-    result: {
-      total_count: results.length,
-      pull_requests: results.map((p) => ({
-        number: p.number,
-        title: p.title,
-        state: p.state,
-        user: p.user,
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-        labels: p.labels,
-        draft: p.draft,
-        additions: p.additions,
-        deletions: p.deletions,
-        changed_files: p.changed_files,
-      })),
-    },
-  });
-});
-
-app.get("/tools/github/pulls/:number", (req: Request, res: Response) => {
-  const num = parseInt(req.params.number);
-  const pr = mockPulls.find((p) => p.number === num);
-  if (!pr) {
-    res.status(404).json({ error: `Pull request #${num} not found` });
+  if (!owner || !repo) {
+    res.status(400).json({ error: "Missing required parameters: owner, repo" });
     return;
   }
-  res.json({ tool: "github/pulls/detail", provider: "github", result: pr });
+
+  try {
+    const resp = await githubFetch(`/repos/${owner}/${repo}/pulls?state=${state}&per_page=30`, token);
+    if (!resp.ok) {
+      const body = await resp.text();
+      res.status(resp.status).json({ error: `GitHub API error: ${body}` });
+      return;
+    }
+
+    const pulls = (await resp.json()) as Array<Record<string, unknown>>;
+    res.json({
+      tool: "github/pulls",
+      provider: "github",
+      result: {
+        total_count: pulls.length,
+        pull_requests: pulls.map((p: Record<string, unknown>) => ({
+          number: p.number,
+          title: p.title,
+          state: p.state,
+          user: (p.user as Record<string, unknown>)?.login,
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          labels: (p.labels as Array<Record<string, unknown>>)?.map((l) => l.name),
+          draft: p.draft,
+          additions: p.additions,
+          deletions: p.deletions,
+          changed_files: p.changed_files,
+        })),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to fetch PRs: ${(err as Error).message}` });
+  }
 });
 
-app.post("/tools/github/pulls", (req: Request, res: Response) => {
-  const state = req.body?.state ?? "open";
-  const results = mockPulls.filter((p) => state === "all" || p.state === state);
+app.post("/tools/github/pulls", async (req: Request, res: Response) => {
+  const token = requireToken(res);
+  if (!token) return;
 
-  res.json({
-    tool: "github/pulls",
-    provider: "github",
-    result: {
-      total_count: results.length,
-      pull_requests: results.map((p) => ({
-        number: p.number,
-        title: p.title,
-        state: p.state,
-        user: p.user,
-        created_at: p.created_at,
-        labels: p.labels,
-        additions: p.additions,
-        deletions: p.deletions,
-        changed_files: p.changed_files,
-      })),
-    },
-  });
+  const owner = req.body?.owner;
+  const repo = req.body?.repo;
+  const state = req.body?.state ?? "open";
+
+  if (!owner || !repo) {
+    res.status(400).json({ error: "Missing required parameters: owner, repo" });
+    return;
+  }
+
+  try {
+    const resp = await githubFetch(`/repos/${owner}/${repo}/pulls?state=${state}&per_page=30`, token);
+    if (!resp.ok) {
+      const body = await resp.text();
+      res.status(resp.status).json({ error: `GitHub API error: ${body}` });
+      return;
+    }
+
+    const pulls = (await resp.json()) as Array<Record<string, unknown>>;
+    res.json({
+      tool: "github/pulls",
+      provider: "github",
+      result: {
+        total_count: pulls.length,
+        pull_requests: pulls.map((p: Record<string, unknown>) => ({
+          number: p.number,
+          title: p.title,
+          state: p.state,
+          user: (p.user as Record<string, unknown>)?.login,
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          labels: (p.labels as Array<Record<string, unknown>>)?.map((l) => l.name),
+          draft: p.draft,
+        })),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to fetch PRs: ${(err as Error).message}` });
+  }
+});
+
+// --- get_pull_request ---
+
+app.get("/tools/github/pulls/:number", async (req: Request, res: Response) => {
+  const token = requireToken(res);
+  if (!token) return;
+
+  const owner = req.query.owner as string;
+  const repo = req.query.repo as string;
+  const num = req.params.number;
+
+  if (!owner || !repo) {
+    res.status(400).json({ error: "Missing required parameters: owner, repo" });
+    return;
+  }
+
+  try {
+    const resp = await githubFetch(`/repos/${owner}/${repo}/pulls/${num}`, token);
+    if (!resp.ok) {
+      if (resp.status === 404) {
+        res.status(404).json({ error: `Pull request #${num} not found` });
+        return;
+      }
+      const body = await resp.text();
+      res.status(resp.status).json({ error: `GitHub API error: ${body}` });
+      return;
+    }
+
+    const pr = await resp.json();
+    res.json({ tool: "github/pulls/detail", provider: "github", result: pr });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to fetch PR: ${(err as Error).message}` });
+  }
+});
+
+// --- list_reviews ---
+
+app.get("/tools/github/pulls/:number/reviews", async (req: Request, res: Response) => {
+  const token = requireToken(res);
+  if (!token) return;
+
+  const owner = req.query.owner as string;
+  const repo = req.query.repo as string;
+  const num = req.params.number;
+
+  if (!owner || !repo) {
+    res.status(400).json({ error: "Missing required parameters: owner, repo" });
+    return;
+  }
+
+  try {
+    const resp = await githubFetch(`/repos/${owner}/${repo}/pulls/${num}/reviews`, token);
+    if (!resp.ok) {
+      const body = await resp.text();
+      res.status(resp.status).json({ error: `GitHub API error: ${body}` });
+      return;
+    }
+
+    const reviews = await resp.json();
+    res.json({ tool: "github/pulls/reviews", provider: "github", result: reviews });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to fetch reviews: ${(err as Error).message}` });
+  }
 });
 
 app.listen(PORT, () => {
+  const hasToken = !!getGitHubToken();
   console.log(`MCP GitHub server running on http://localhost:${PORT}`);
+  if (!hasToken) {
+    console.log("  WARNING: No GitHub token found. Set GITHUB_TOKEN or run purfle setup.");
+  }
 });
