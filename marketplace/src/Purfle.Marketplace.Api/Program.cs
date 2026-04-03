@@ -135,4 +135,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapRazorPages();
+app.MapGet("/health", () => Results.Ok(new { status = "ok", version = "0.1.0" }));
 app.Run();
