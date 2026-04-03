@@ -94,7 +94,7 @@ my-agent.purfle/
 - **Host:** .NET MAUI — Windows + Mac from one codebase
 - **AIVM:** C# class inside the MAUI app — no separate process or daemon
 - **Agents:** One thread each, isolated AssemblyLoadContext, sandboxed by manifest
-- **Trigger model:** Scheduler built into AIVM — cron or interval in manifest
+- **Trigger model:** Scheduler built into AIVM — trigger type declared in manifest
 - **Output:** Local file under `<app-data>/aivm/output/<agent-id>/`
 - **Identity:** JWS with ES256 (ECDSA). DID migration path later.
 - **Algorithm:** ES256 — locked.
@@ -106,7 +106,6 @@ my-agent.purfle/
 - **`io` block:** Optional, no enforcement in phase 1.
 - **No over-engineering:** No abstractions for hypothetical requirements.
 - **Deep link:** `purfle://` registered Windows + macOS (CFBundleURLTypes).
-  `purfle://install?id={id}` → ConsentPage. `purfle://install?url={url}` → download → ConsentPage.
 - **Admin auth:** PURFLE_ADMIN_TOKEN env var — bearer token for /admin routes.
 - **Azure:** Consumption plan (Functions) + F1 free tier (App Service). Budget-conscious.
 - **Demo model:** Azure hosts real APIs. `purfle demo` starts local MCP servers only.
@@ -137,9 +136,19 @@ my-agent.purfle/
     "signature": "<JWS compact serialization — omit at authoring time>"
   },
   "schedule": {
-    "trigger": "interval | cron | startup",
+    "trigger": "interval | cron | startup | window | event",
     "interval_minutes": 15,
-    "cron": "0 7 * * *"
+    "cron": "0 7 * * *",
+    "window": {
+      "start":    "<ISO 8601 datetime or cron expression>",
+      "end":      "<ISO 8601 datetime or cron expression>",
+      "run_at":   "window_open | window_close | interval_within",
+      "timezone": "UTC"
+    },
+    "event": {
+      "source": "<mcp server url>",
+      "topic":  "<string>"
+    }
   },
   "capabilities": ["llm.chat", "network.outbound", "env.read"],
   "permissions": {
@@ -176,6 +185,30 @@ my-agent.purfle/
 | `fs.read` | `paths: string[]` | Read from listed paths |
 | `fs.write` | `paths: string[]` | Write to listed paths |
 | `mcp.tool` | none | Invoke MCP tools declared in `tools` |
+| `hardware.*.*` | `asset_id, window_start, window_end, commands[]` | RFC 0002 hardware access — future |
+
+### Schedule trigger types
+| Trigger | Required fields | Meaning |
+|---|---|---|
+| `interval` | `interval_minutes` | Run every N minutes, indefinitely |
+| `cron` | `cron` | Run on NCrontab expression |
+| `startup` | none | Run once when AIVM starts |
+| `window` | `window.start, window.end, window.run_at` | Run relative to a declared time window |
+| `event` | `event.source, event.topic` | Run when an MCP server emits a named event |
+
+**window trigger details:**
+- `window_open` — fires once when the window opens (start time reached)
+- `window_close` — fires once just before the window closes (end time approached)
+- `interval_within` — fires on `interval_minutes` cadence, only while inside the window;
+  suppressed outside the window, no catch-up runs after window closes
+- Window start/end can be ISO 8601 datetime (one-shot) or cron expression (recurring windows)
+- Example: a daily 6-hour maintenance window → `start: "0 2 * * *"`, `end: "0 8 * * *"`
+
+**event trigger details:**
+- AIVM subscribes to the MCP server's event stream at agent load time
+- When the named topic fires, the agent runs immediately on its dedicated thread
+- If the agent is already running, the event is queued (one deep); further events are dropped
+- Useful for: webhook callbacks, sensor threshold alerts, orbital pass notifications (RFC 0002)
 
 ---
 
@@ -188,7 +221,7 @@ my-agent.purfle/
 | Manifest spec | JSON Schema Draft 2020-12 |
 | Agent identity | JWS / ES256 |
 | Inference | Anthropic (primary); OpenAI, Gemini, Ollama |
-| Scheduler | PeriodicTimer + NCrontab |
+| Scheduler | PeriodicTimer + NCrontab + window/event extensions (planned) |
 | SDK / CLI | TypeScript / Node.js |
 | Tests | xUnit + Jest |
 | macOS credentials | Keychain via SecureStorage |
@@ -211,10 +244,10 @@ GET (verification) is unauthenticated. Registration is a one-time human action �
    - Windows: `$env:PURFLE_REGISTRY_API_KEY = "paste-key-here"`
    - macOS: `export PURFLE_REGISTRY_API_KEY=paste-key-here`
 3. Run: `purfle setup`
-4. Done. The public key is now registered in Azure permanently.
+4. Done. Public key is registered in Azure permanently.
 
 CI does not need this key. CI only verifies signatures (GET, unauthenticated).
-You will only need to repeat this if you generate a new key pair.
+Repeat only if you generate a new key pair.
 
 ---
 
@@ -223,8 +256,8 @@ You will only need to repeat this if you generate a new key pair.
 | Service | URL | Status |
 |---|---|---|
 | Key Registry | https://purfle-key-registry-bxa8bmejh6hhdfe0.centralus-01.azurewebsites.net | Live |
-| Marketplace API | purfle-marketplace.azurewebsites.net | Bicep ready, not yet deployed |
-| IdentityHub.Web | purfle-identityhub-web.azurewebsites.net | Bicep ready, not yet deployed |
+| Marketplace API | purfle-marketplace.azurewebsites.net | Bicep ready, not deployed |
+| IdentityHub.Web | purfle-identityhub-web.azurewebsites.net | Bicep ready, not deployed |
 
 ---
 
@@ -233,7 +266,7 @@ You will only need to repeat this if you generate a new key pair.
 | Variable | Where | Purpose |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Local + GH secret | LLM inference |
-| `PURFLE_REGISTRY_API_KEY` | Local only, one-time | Register signing key (see above) |
+| `PURFLE_REGISTRY_API_KEY` | Local only, one-time | Register signing key |
 | `PURFLE_ADMIN_TOKEN` | Azure App Service env | IdentityHub.Web admin auth |
 | `AZURE_STORAGE_CONNECTION_STRING` | Azure App Service env | Backups + bundle store |
 | `MARKETPLACE_API_URL` | IdentityHub.Web config | Marketplace proxy |
@@ -243,6 +276,11 @@ You will only need to repeat this if you generate a new key pair.
 | `APPLE_APP_PASSWORD` | GH secret | Notarization app-specific password |
 | `WINDOWS_CERT_PFX` | GH secret (base64) | MSIX signing |
 | `WINDOWS_CERT_PASSWORD` | GH secret | MSIX signing |
+| `AZURE_CREDENTIALS` | GH secret | Bicep deploy (service principal JSON) |
+| `GITHUB_TOKEN` | Local env or ~/.purfle/github-token | GitHub MCP server (repo scope) |
+| `GMAIL_CLIENT_ID` | Local env | Gmail OAuth client ID |
+| `GMAIL_CLIENT_SECRET` | Local env | Gmail OAuth client secret |
+| `PURFLE_BUNDLES_CONTAINER` | Azure App Service env | Azure bundle blob container name |
 
 ---
 
@@ -251,68 +289,69 @@ You will only need to repeat this if you generate a new key pair.
 
 ### What exists and works
 
-**Spec** — SPEC.md, JSON Schema, identity schema, RFC 0001, examples, AGENT_MODEL.md
+**Spec**
+- SPEC.md, JSON Schema (Draft 2020-12), identity schema
+- RFC 0001 — identity model (JWS/ES256)
+- RFC 0002 — hardware access model (concept/pre-proposal) `spec/rfcs/0002-hardware-access-model.md`
+- Examples: hello-world, assistant, email-monitor, demo-agent, window-agent, event-agent
+- AGENT_MODEL.md
 
-**Runtime — 122 passing tests**
+**Runtime — 132 passing tests**
 - AgentLoader (7-step), ManifestLoader/Validator, IdentityVerifier, JWS ES256
 - IKeyRegistry, HttpKeyRegistryClient
 - CapabilityNegotiator, AgentSandbox (network/fs/env/MCP)
 - LoadFailureReason (13 reasons), BuiltInToolExecutor, ConversationSession
-- AnthropicAdapter, GeminiAdapter, OpenClawAdapter, OllamaAdapter
-  (all: backoff, token usage reporting)
+- AnthropicAdapter, GeminiAdapter, OpenClawAdapter, OllamaAdapter (backoff, token usage)
 - ProcessAgentRunner, CredentialStoreFactory (Win/Mac/Linux/InMemory)
-- Scheduler (overlap skip, crash isolation), AgentRunner (run.jsonl + run.log)
-- AgentAssemblyLoadContext, McpClient (stdio JSON-RPC 2.0)
-- Purfle.TestAgents.Hello (HelloAgent + GreetTool)
+- Scheduler: interval, cron, startup, window, event — overlap skip, crash isolation
+- WindowTrigger: window_open, window_close, interval_within (ISO 8601 + cron windows)
+- EventTrigger: IEventSource/IEventSourceFactory, queue depth 1, drop on full
+- AgentRunner (run.jsonl + run.log), AgentAssemblyLoadContext, McpClient
+- Purfle.TestAgents.Hello
 
-**Key Registry** — deployed, trust loop verified, new key pair 2026-04-02
+**Key Registry** — deployed, trust loop verified
+- Signing key: com.clarksonr/release-2026 (2026-04-02)
 - Private key: temp-agent/signing.key.pem — DO NOT COMMIT
-- Public key NOT YET registered — run purfle setup locally (see Key Registration above)
+- Public key NOT YET registered in Azure — run purfle setup locally
 
-**SDK & CLI** — 73 core + 16 CLI tests
-- @purfle/core: Ajv validation, JWS, canonical JSON
-- @purfle/cli: init, build, sign, simulate, publish, search, install, login,
-  validate, run, security-scan, pack, setup, demo
+**SDK & CLI** — 49 core + 17 CLI tests
+- init, build, sign, simulate (--trigger window_open/event), publish, search, install, login,
+  validate, run, security-scan, pack (SHA-256 sidecar), setup (GitHub token check), demo
+- Bundle SHA-256 integrity: pack writes .sha256, install verifies hash on download
 
 **Desktop App**
 - SetupWizardPage (4-step), ConsentPage, AgentDetailPage (5-tab)
 - AgentCard, LogViewPage, AgentRunPage, SettingsPage
-- purfle:// deep link (Windows + macOS registered)
-- NotificationService (Windows toast; macOS UNUserNotificationCenter)
-- macOS: Entitlements (sandbox, network, keychain), code signing config in csproj
+- purfle:// deep link (Windows + macOS), UNUserNotificationCenter (macOS)
+- Entitlements.plist, CFBundleURLTypes, code signing config in csproj
 
-**Polyglot Agents** — 10 agents (C# + TypeScript, IPC protocol)
+**Polyglot Agents** — 10 agents (C# + TypeScript, IPC)
 
-**MCP Servers** — 12 total (:8100–:8111); :8102 gmail and :8111 github are mocks
+**MCP Servers** — 12 total (:8100–:8111)
+- :8111 GitHub — real GitHub REST API (token via GITHUB_TOKEN or ~/.purfle/github-token)
+- :8102 Gmail — real Gmail API with OAuth 2.0 PKCE (falls back to mock if no OAuth)
 
 **IdentityHub**
-- Core, Api, Web (public site + admin)
-- Web public: Home, /agents, /agents/{id}, /publishers/{id}, /keys/{id}, /badge/{id}, /feed.xml
-- Web admin: Dashboard, Agent moderation, Publisher mgmt, Key registry, Attestations, Backup/Restore
-- BackupService: local zip + Azure Blob push/pull/list
-- /health endpoints on both Api and Web
+- Core, Api, Web (public + admin + backup/restore)
+- GET /health on Api and Web
 
-**Marketplace** — 19 tests, LocalFileBundleStore (Azure store not wired)
+**Marketplace** — 24 tests, LocalFileBundleStore + AzureBlobBundleStore, GET /health
+- AzureBlobBundleStore: AZURE_STORAGE_CONNECTION_STRING + PURFLE_BUNDLES_CONTAINER
+- Bundle SHA-256 hash stored on upload, returned in version metadata
 
 **Dogfood Agents** — email-monitor, pr-watcher, report-builder, file-assistant (signed)
 
-**Marketplace** — /health endpoint added
+**Infrastructure** — infra/marketplace.bicep + infra/identityhub-web.bicep
 
-**Infrastructure** — Bicep templates in infra/
-- infra/marketplace.bicep (F1 App Service)
-- infra/identityhub-web.bicep (shares F1 plan)
-
-**CI/CD** — ci.yml (matrix + macOS build), release.yml (tag-triggered + macOS .pkg + notarization + Windows MSIX + Azure deploy), dependabot.yml
+**CI/CD** — ci.yml (matrix + macOS), release.yml (MSIX + .pkg + notarization + Azure deploy)
 
 **Docs** — GETTING_STARTED, MANIFEST_REFERENCE, PUBLISHING, TROUBLESHOOTING, ROADMAP
 
 ### What does NOT exist yet (priority order)
-1. Register signing public key — one-time local action, see Key Registration section above
-2. Azure deployment: run Bicep + deploy step (infra ready, needs AZURE_CREDENTIALS secret)
-3. Azure-backed bundle blob store (AzureBlobBundleStore)
-4. Bundle SHA-256 integrity hashing
-5. Real GitHub MCP server (replace mock)
-6. Real Gmail MCP server (verify OAuth end-to-end)
+1. Register signing public key — one-time local action (see Key Registration above)
+2. Azure deployment — needs AZURE_CREDENTIALS secret then tag push triggers it
+3. Cross-agent output sharing (deferred)
+4. Real-time MCP event source implementation (IEventSource for production use)
 
 ---
 
@@ -351,12 +390,6 @@ Files:
 - path/to/file1
 - path/to/file2
 Notes: <why together; note if any file also modified in a later group>
-
-## Group: <next message>
-Type: ...
-Files:
-- ...
-Notes: ...
 ```
 
 **Execution at session end:**
