@@ -112,7 +112,7 @@ async function startOAuthFlow(): Promise<void> {
   authUrl.searchParams.set("client_id", creds.clientId);
   authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("response_type", "code");
-  authUrl.searchParams.set("scope", "https://www.googleapis.com/auth/gmail.readonly");
+  authUrl.searchParams.set("scope", "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send");
   authUrl.searchParams.set("code_challenge", codeChallenge);
   authUrl.searchParams.set("code_challenge_method", "S256");
   authUrl.searchParams.set("access_type", "offline");
@@ -231,7 +231,7 @@ app.get("/", async (_req: Request, res: Response) => {
     version: "2.0.0",
     status: hasTokens ? "ok" : hasCreds ? "needs-auth" : "mock-mode",
     provider: hasTokens ? "Gmail API" : "Gmail API (mock fallback)",
-    tools: ["email/list (list_messages)", "email/read (get_message)", "email/search (search_messages)"],
+    tools: ["email/list (list_messages)", "email/read (get_message)", "email/search (search_messages)", "email/send (send_message)"],
   });
 });
 
@@ -551,6 +551,86 @@ app.post("/tools/email/search", async (req: Request, res: Response) => {
     res.json({ tool: "email/search", provider: "gmail", result: { query, ...data as object } });
   } catch (err) {
     res.status(500).json({ error: `Failed: ${(err as Error).message}` });
+  }
+});
+
+// --- send_message ---
+
+app.post("/tools/email/send", async (req: Request, res: Response) => {
+  const to = req.body?.to;
+  const subject = req.body?.subject;
+  const body = req.body?.body;
+
+  if (!to || !subject || !body) {
+    res.status(400).json({ error: "Missing required parameters: to, subject, body" });
+    return;
+  }
+
+  if (useMockData()) {
+    res.json({
+      tool: "email/send",
+      provider: "gmail (mock)",
+      result: {
+        id: `mock-${Date.now()}`,
+        to,
+        subject,
+        status: "sent (mock)",
+      },
+    });
+    return;
+  }
+
+  const token = await getAccessToken();
+  if (!token) {
+    res.status(401).json({ error: "Gmail not authorized. Run the OAuth flow first." });
+    return;
+  }
+
+  // Build RFC 2822 message
+  const rawMessage = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `Content-Type: text/plain; charset=utf-8`,
+    "",
+    body,
+  ].join("\r\n");
+
+  const encoded = Buffer.from(rawMessage)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+
+  try {
+    const sendResp = await fetch(`${GMAIL_API}/users/me/messages/send`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ raw: encoded }),
+    });
+
+    if (!sendResp.ok) {
+      const errBody = await sendResp.text();
+      res.status(sendResp.status).json({ error: `Gmail API error: ${errBody}` });
+      return;
+    }
+
+    const data = (await sendResp.json()) as Record<string, unknown>;
+    res.json({
+      tool: "email/send",
+      provider: "gmail",
+      result: {
+        id: data.id,
+        threadId: data.threadId,
+        to,
+        subject,
+        status: "sent",
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to send: ${(err as Error).message}` });
   }
 });
 
