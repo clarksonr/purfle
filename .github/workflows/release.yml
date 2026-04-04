@@ -282,6 +282,26 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Deploy Storage Account
+        run: |
+          az deployment group create \
+            --resource-group purfle-rg \
+            --template-file infra/storage.bicep \
+            --parameters storageAccountName=purflebundlestorage containerName=bundles
+
+      - name: Set Storage Connection String on App Service
+        run: |
+          CONN_STRING=$(az deployment group show \
+            --resource-group purfle-rg \
+            --name storage \
+            --query properties.outputs.connectionString.value -o tsv 2>/dev/null || echo "")
+          if [ -n "$CONN_STRING" ]; then
+            az webapp config appsettings set \
+              --resource-group purfle-rg \
+              --name purfle-marketplace \
+              --settings AZURE_STORAGE_CONNECTION_STRING="$CONN_STRING"
+          fi
+
       - name: Publish Marketplace API
         run: >
           dotnet publish marketplace/src/Purfle.Marketplace.Api/Purfle.Marketplace.Api.csproj
