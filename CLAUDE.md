@@ -231,7 +231,7 @@ my-agent.purfle/
 
 | Layer | Technology |
 |---|---|
-| Desktop | .NET MAUI (C#) — Windows + macOS |
+| Desktop | .NET MAUI (C#) — Windows + macOS; Avalonia — Linux |
 | AIVM | C# class inside MAUI |
 | Manifest spec | JSON Schema Draft 2020-12 |
 | Agent identity | JWS / ES256 |
@@ -315,7 +315,7 @@ Repeat only if you generate a new key pair.
 - Examples: hello-world, assistant, email-monitor, demo-agent, window-agent, event-agent
 - AGENT_MODEL.md
 
-**Runtime — 169 unit tests + 11 integration tests**
+**Runtime — 172 unit tests + 11 integration tests**
 - AgentLoader (7-step), ManifestLoader/Validator, IdentityVerifier, JWS ES256
 - IKeyRegistry, HttpKeyRegistryClient
 - CapabilityNegotiator, AgentSandbox (network/fs/env/MCP)
@@ -328,7 +328,8 @@ Repeat only if you generate a new key pair.
 - Scheduler: interval, cron, startup, window, event — overlap skip, crash isolation
 - WindowTrigger: window_open, window_close, interval_within (ISO 8601 + cron windows)
 - EventTrigger: IEventSource/IEventSourceFactory, queue depth 1, drop on full
-- **SseEventSource** — production SSE client with exponential backoff + jitter reconnect
+- **SseEventSource** — production SSE client with exponential backoff + jitter reconnect,
+  degraded status after 5 consecutive failures (AgentStatus.Degraded), continues retrying
 - **SseEventSourceFactory** — DI-ready factory for production event sources
 - AgentRunner (run.jsonl + run.log), AgentAssemblyLoadContext, McpClient
 - Purfle.TestAgents.Hello
@@ -372,27 +373,40 @@ Repeat only if you generate a new key pair.
 - purfle:// deep link (Windows + macOS)
 - Entitlements.plist, CFBundleURLTypes, code signing config in csproj
 
+**Linux Desktop App (Avalonia)**
+- Purfle.Desktop.Avalonia — Avalonia 11 project targeting `net10.0` with `linux-x64;linux-arm64`
+- Shares AIVM core (Purfle.Runtime) with MAUI app
+- Agent card UI with status dots, Run Now, output preview
+- Loads agents from `~/.purfle/agents/`, wires Scheduler + SseEventSourceFactory
+- Linux notifications via `notify-send` (libnotify fallback to console)
+
 **Polyglot Agents** — 10 agents (C# + TypeScript, IPC)
 
 **MCP Servers** — 12 total (:8100–:8111)
-- :8111 GitHub — real GitHub REST API (token via GITHUB_TOKEN or ~/.purfle/github-token)
-- :8102 Gmail — real Gmail API with OAuth 2.0 PKCE (falls back to mock if no OAuth)
+- :8111 GitHub — real GitHub REST API (list_repos, list_prs, get_pr, list_reviews, list_issues, get_issue)
+- :8102 Gmail — real Gmail API with OAuth 2.0 PKCE (list, read, search, send; mock fallback)
 
 **IdentityHub**
 - Core, Api, Web (public + admin + backup/restore)
 - GET /health on Api and Web
 
 **Marketplace** — 24 tests, LocalFileBundleStore + AzureBlobBundleStore, GET /health
-- AzureBlobBundleStore: AZURE_STORAGE_CONNECTION_STRING + PURFLE_BUNDLES_CONTAINER
+- AzureBlobBundleStore: AZURE_STORAGE_CONNECTION_STRING + PURFLE_BUNDLES_CONTAINER,
+  SHA-256 computed on upload (stored as blob metadata), retrievable via RetrieveWithHashAsync/GetHashAsync
 - Bundle SHA-256 hash stored on upload, returned in version metadata
+- Schema: optional `bundle.sha256` field for marketplace-set integrity hash
 
 **Dogfood Agents** — email-monitor, pr-watcher, report-builder, file-assistant (signed)
 - **report-builder** — rich Markdown digest with tables (displays in Dashboard digest)
 - report-builder now reads email-monitor and pr-watcher via IAgentOutputReader (io.reads wired)
 
-**Infrastructure** — infra/marketplace.bicep + infra/identityhub-web.bicep
+**Developer Scripts**
+- `scripts/setup-dev.sh` + `scripts/setup-dev.ps1` — cross-platform env checker (9 checks)
+- `scripts/start-dev.sh` + `scripts/start-dev.ps1` — starts all services (IdentityHub, Marketplace, MCP, desktop)
 
-**CI/CD** — ci.yml (matrix + macOS), release.yml (MSIX + .pkg + notarization + Azure deploy)
+**Infrastructure** — infra/marketplace.bicep + infra/identityhub-web.bicep + infra/storage.bicep
+
+**CI/CD** — ci.yml (matrix + macOS), release.yml (MSIX + .pkg + notarization + Azure deploy + storage.bicep)
 
 **Docs** — GETTING_STARTED, MANIFEST_REFERENCE, PUBLISHING, TROUBLESHOOTING, ROADMAP
 - CONTRIBUTING.md — contributor guide with prerequisites, build, test, branching, commit conventions
