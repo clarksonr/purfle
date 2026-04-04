@@ -6,6 +6,7 @@
     <Project Path="src/Purfle.Runtime.Ollama/Purfle.Runtime.Ollama.csproj" />
     <Project Path="src/Purfle.Runtime.OpenClaw/Purfle.Runtime.OpenClaw.csproj" />
     <Project Path="src/Purfle.Runtime/Purfle.Runtime.csproj" />
+    <Project Path="src/Purfle.Desktop.Avalonia/Purfle.Desktop.Avalonia.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Purfle.Runtime.Tests/Purfle.Runtime.Tests.csproj" />
