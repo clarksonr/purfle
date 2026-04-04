@@ -75,6 +75,18 @@
           "uniqueItems": true
         }
       }
+    },
+    "bundle": {
+      "type": "object",
+      "description": "Optional bundle metadata set by the marketplace on publish.",
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "type": "string",
+          "description": "SHA-256 hex digest of the .purfle bundle. Set by marketplace, verified by CLI on install.",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
     }
   },
   "allOf": [
