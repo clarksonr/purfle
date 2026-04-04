@@ -266,7 +266,89 @@ public sealed class SseEventSourceTests
         Assert.IsType<SseEventSource>(source);
     }
 
+    [Fact]
+    public async Task FiveConsecutiveFailures_FiresDegraded()
+    {
+        var errorHandler = new FakeErrorHandler();
+        var client = new HttpClient(errorHandler);
+        var source = new SseEventSource("http://localhost:9999", "test-topic", httpClient: client);
+        var degradedFired = new TaskCompletionSource<bool>();
+
+        source.OnDegraded += () => degradedFired.TrySetResult(true);
+
+        await source.ConnectAsync();
+
+        // Wait for 5 consecutive failures with backoff
+        // Backoff is 1s, 2s, 4s... but with errors, it should fire degraded after 5 failures
+        var result = await Task.WhenAny(degradedFired.Task, Task.Delay(20000));
+        Assert.True(degradedFired.Task.IsCompleted,
+            $"OnDegraded should fire after {SseEventSource.DegradedThreshold} failures, " +
+            $"got {source.ConsecutiveFailures} failures");
+
+        await source.DisconnectAsync();
+    }
+
+    [Fact]
+    public async Task SuccessfulConnect_ResetsFailureCount()
+    {
+        var handler = new FakeSseHandler();
+        var client = new HttpClient(handler);
+        var source = new SseEventSource("http://localhost:9999", "test-topic", httpClient: client);
+
+        await source.ConnectAsync();
+        await Task.Delay(100);
+
+        // After successful connect, consecutive failures should be 0
+        Assert.Equal(0, source.ConsecutiveFailures);
+
+        await source.DisconnectAsync();
+    }
+
+    [Fact]
+    public async Task DegradedAgent_ContinuesRetrying()
+    {
+        var errorHandler = new FakeErrorHandler();
+        var client = new HttpClient(errorHandler);
+        var source = new SseEventSource("http://localhost:9999", "test-topic", httpClient: client);
+        var degradedFired = new TaskCompletionSource<bool>();
+
+        source.OnDegraded += () => degradedFired.TrySetResult(true);
+
+        await source.ConnectAsync();
+
+        // Wait for degraded (5 failures with exponential backoff: ~1+2+4+8+16s ≈ 31s)
+        var result = await Task.WhenAny(degradedFired.Task, Task.Delay(40000));
+        Assert.True(degradedFired.Task.IsCompleted, "Should be degraded");
+
+        // After degraded, the source should still be retrying (wait for next backoff cycle)
+        var failuresBefore = source.ConsecutiveFailures;
+        await Task.Delay(65000); // max backoff is 60s
+        Assert.True(source.ConsecutiveFailures > failuresBefore,
+            "Should continue retrying after degraded");
+
+        await source.DisconnectAsync();
+    }
+
     // -- test helpers --
+
+    /// <summary>
+    /// HTTP handler that always returns 500 to simulate repeated connection failures.
+    /// </summary>
+    private sealed class FakeErrorHandler : HttpMessageHandler
+    {
+        public int AttemptCount;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken ct)
+        {
+            Interlocked.Increment(ref AttemptCount);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            {
+                Content = new StringContent("Server error"),
+            });
+        }
+    }
+
 
     private static AgentManifest MakeEventManifest()
         => new()

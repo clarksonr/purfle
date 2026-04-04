@@ -349,6 +349,17 @@ public sealed class Scheduler
         var eventSignal = new SemaphoreSlim(0, 2);
         var queuedCount = 0;
 
+        // Wire degraded status if the source supports it
+        if (source is SseEventSource sse)
+        {
+            sse.OnDegraded += () =>
+            {
+                runner.Status = AgentStatus.Degraded;
+                Console.Error.WriteLine(
+                    $"[Scheduler] Agent {runner.Manifest.Id} marked degraded — event source connection failing repeatedly.");
+            };
+        }
+
         source.OnEvent += () =>
         {
             if (runner.Status == AgentStatus.Running)

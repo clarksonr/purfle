@@ -17,6 +17,7 @@ public sealed class SseEventSource : IEventSource
 
     private CancellationTokenSource? _cts;
     private Task? _readLoop;
+    private int _consecutiveFailures;
 
     /// <summary>Minimum backoff delay on reconnect.</summary>
     internal static readonly TimeSpan MinBackoff = TimeSpan.FromSeconds(1);
@@ -24,7 +25,19 @@ public sealed class SseEventSource : IEventSource
     /// <summary>Maximum backoff delay on reconnect.</summary>
     internal static readonly TimeSpan MaxBackoff = TimeSpan.FromSeconds(60);
 
+    /// <summary>Number of consecutive failures before firing <see cref="OnDegraded"/>.</summary>
+    public const int DegradedThreshold = 5;
+
     public event Action? OnEvent;
+
+    /// <summary>
+    /// Fires when <see cref="DegradedThreshold"/> consecutive connection failures
+    /// occur. The subscriber (typically the Scheduler) should mark the agent as degraded.
+    /// </summary>
+    public event Action? OnDegraded;
+
+    /// <summary>Current count of consecutive connection failures (for testing).</summary>
+    public int ConsecutiveFailures => _consecutiveFailures;
 
     /// <param name="serverUrl">Base URL of the MCP server (e.g. <c>http://localhost:9999</c>).</param>
     /// <param name="topic">The event topic to subscribe to. Non-matching events are ignored.</param>
@@ -82,8 +95,9 @@ public sealed class SseEventSource : IEventSource
                 using var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
                 using var reader = new StreamReader(stream);
 
-                // Reset backoff on successful connect
+                // Reset backoff and failure counter on successful connect
                 backoff = MinBackoff;
+                _consecutiveFailures = 0;
                 Console.Error.WriteLine($"[SseEventSource] Streaming from {_serverUrl}");
 
                 string? eventType = null;
@@ -123,8 +137,17 @@ public sealed class SseEventSource : IEventSource
             }
             catch (Exception ex)
             {
+                _consecutiveFailures++;
                 Console.Error.WriteLine(
-                    $"[SseEventSource] Connection to {_serverUrl} failed ({ex.Message}), retrying in {(int)backoff.TotalMilliseconds}ms");
+                    $"[SseEventSource] Connection to {_serverUrl} failed ({ex.Message}), " +
+                    $"failures={_consecutiveFailures}, retrying in {(int)backoff.TotalMilliseconds}ms");
+
+                if (_consecutiveFailures == DegradedThreshold)
+                {
+                    Console.Error.WriteLine(
+                        $"[SseEventSource] {DegradedThreshold} consecutive failures for {_serverUrl} — marking degraded");
+                    OnDegraded?.Invoke();
+                }
             }
 
             if (ct.IsCancellationRequested) break;

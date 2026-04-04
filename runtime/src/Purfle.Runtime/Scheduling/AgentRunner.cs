@@ -5,7 +5,7 @@ using Purfle.Runtime.TokenUsage;
 
 namespace Purfle.Runtime.Scheduling;
 
-public enum AgentStatus { Idle, Running, Error, Stopped }
+public enum AgentStatus { Idle, Running, Error, Stopped, Degraded }
 
 /// <summary>
 /// Owns the execution lifecycle for a single scheduled agent.
@@ -24,7 +24,7 @@ public sealed class AgentRunner
     private readonly ITokenUsageTracker? _tokenUsageTracker;
 
     public AgentManifest Manifest    { get; }
-    public AgentStatus   Status      { get; private set; } = AgentStatus.Idle;
+    public AgentStatus   Status      { get; internal set; } = AgentStatus.Idle;
     public DateTime?     LastRun     { get; private set; }
     public DateTime?     NextRun     { get; internal set; }
 
